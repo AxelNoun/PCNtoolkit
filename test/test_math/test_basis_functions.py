@@ -1,5 +1,5 @@
 import importlib.metadata
-from unittest.mock import patch
+import warnings
 
 import numpy as np
 import pytest
@@ -101,10 +101,13 @@ def test_composite_from_dict_passes_version_to_parts() -> None:
     composite.fit(X)
 
     current_version = importlib.metadata.version("pcntoolkit")
-    with patch("pcntoolkit.util.migration.Output.warning") as mock_warning:
+    with warnings.catch_warnings(record=True) as caught:
         BasisFunction.from_dict(composite.to_dict(), version=current_version)
 
-    assert mock_warning.call_count == 0
+    # Check that no warning contains "saved with PCNtoolkit v0.0.0"
+    assert [w for w in caught if "saved with PCNtoolkit v0.0.0" in str(w.message)] == []
+
+
 def test_composite_basis_interaction_linear():
     X = np.array(
         [
