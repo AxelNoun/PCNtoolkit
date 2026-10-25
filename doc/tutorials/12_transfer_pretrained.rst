@@ -28,17 +28,12 @@ Install requests manually as it is not install with
 
 .. code:: text
 
-    Requirement already satisfied: requests in /opt/hostedtoolcache/Python/3.13.15/x64/lib/python3.13/site-packages (2.34.2)
-
-    Requirement already satisfied: charset_normalizer<4,>=2 in /opt/hostedtoolcache/Python/3.13.15/x64/lib/python3.13/site-packages (from requests) (3.5.1)
-
-    Requirement already satisfied: idna<4,>=2.5 in /opt/hostedtoolcache/Python/3.13.15/x64/lib/python3.13/site-packages (from requests) (3.20)
-
-    Requirement already satisfied: urllib3<3,>=1.26 in /opt/hostedtoolcache/Python/3.13.15/x64/lib/python3.13/site-packages (from requests) (2.8.0)
-
-    Requirement already satisfied: certifi>=2023.5.7 in /opt/hostedtoolcache/Python/3.13.15/x64/lib/python3.13/site-packages (from requests) (2026.7.22)
-
-
+    Requirement already satisfied: requests in C:\Users\kontsi\AppData\Local\anaconda3\envs\.ptk-dev\Lib\site-packages (2.32.5)
+    Requirement already satisfied: charset_normalizer<4,>=2 in C:\Users\kontsi\AppData\Local\anaconda3\envs\.ptk-dev\Lib\site-packages (from requests) (3.4.4)
+    Requirement already satisfied: idna<4,>=2.5 in C:\Users\kontsi\AppData\Local\anaconda3\envs\.ptk-dev\Lib\site-packages (from requests) (3.11)
+    Requirement already satisfied: urllib3<3,>=1.21.1 in C:\Users\kontsi\AppData\Local\anaconda3\envs\.ptk-dev\Lib\site-packages (from requests) (2.6.3)
+    Requirement already satisfied: certifi>=2017.4.17 in C:\Users\kontsi\AppData\Local\anaconda3\envs\.ptk-dev\Lib\site-packages (from requests) (2026.1.4)
+    
 
 .. code:: ipython3
 
@@ -190,8 +185,7 @@ parcellation, trained on 67.000 subjects from 89 sites.
 
 .. code:: text
 
-    Downloading BLRw_ct_DES_lifespan_67K_89sites ...
-    Model available at /home/runner/work/PCNtoolkit/PCNtoolkit/resources/pretrained/BLRw_ct_DES_lifespan_67K_89sites
+    Model available at c:\Users\kontsi\Documents\GitHub\PCNtoolkit-local\examples\resources\pretrained\BLRw_ct_DES_lifespan_67K_89sites
     
 
 3. Load the model and see what it expects
@@ -223,14 +217,10 @@ models published earlier.
 
 .. code:: text
 
-    /home/runner/work/PCNtoolkit/PCNtoolkit/pcntoolkit/util/output.py:309: UserWarning: Process: 3147 - 2026-09-25 18:00:42 - This model was saved with PCNtoolkit v1.1.2, but you are running v1.4.0. Loading this model in v1.4.0...
-      warnings.warn(message, category)
-    /home/runner/work/PCNtoolkit/PCNtoolkit/pcntoolkit/util/output.py:309: UserWarning: Process: 3147 - 2026-09-25 18:00:42 - This model was saved with PCNtoolkit v1.1.1, but you are running v1.4.0. Loading this model in v1.4.0...
-      warnings.warn(message, category)
-    /home/runner/work/PCNtoolkit/PCNtoolkit/pcntoolkit/util/output.py:309: UserWarning: Process: 3147 - 2026-09-25 18:00:43 - This model was saved with PCNtoolkit v1.1.1, but you are running v1.4.0. Loading this model in v1.4.0...
-      warnings.warn(message, category)
-    /home/runner/work/PCNtoolkit/PCNtoolkit/pcntoolkit/util/output.py:309: UserWarning: Process: 3147 - 2026-09-25 18:00:43 - This model was saved with PCNtoolkit v1.1.2, but you are running v1.4.0. Loading this model in v1.4.0...
-      warnings.warn(message, category)
+    C:\Users\kontsi\Documents\GitHub\PCNtoolkit-local\pcntoolkit\util\migration.py:185: UserWarning: This model was saved with PCNtoolkit v1.1.1, but you are running v1.4.0. Loading this model in v1.4.0...
+      warnings.warn(
+    C:\Users\kontsi\Documents\GitHub\PCNtoolkit-local\pcntoolkit\util\migration.py:185: UserWarning: This model was saved with PCNtoolkit v1.1.2, but you are running v1.4.0. Loading this model in v1.4.0...
+      warnings.warn(
     
 
 .. code:: text

@@ -104,12 +104,8 @@ def test_composite_from_dict_passes_version_to_parts() -> None:
     with warnings.catch_warnings(record=True) as caught:
         BasisFunction.from_dict(composite.to_dict(), version=current_version)
 
-    # The parts carry no ptk_version of their own; if from_dict failed to
-    # pass the version down, they would default to 0.0.0 and the 1.2.0post1
-    # migration would fire for them. Assert on that message specifically
-    # rather than on zero warnings, so an unrelated deprecation from a
-    # dependency cannot fail this test.
-    assert [w for w in caught if "saved with v0.0.0" in str(w.message)] == []
+    # Check that no warning contains "saved with PCNtoolkit v0.0.0"
+    assert [w for w in caught if "saved with PCNtoolkit v0.0.0" in str(w.message)] == []
 
 
 def test_composite_basis_interaction_linear():

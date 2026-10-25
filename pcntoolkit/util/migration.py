@@ -173,15 +173,8 @@ class MigrationRegistry:
         # Apply migrations in ascending version order.
         for introduced_in, fn in self._migrations[component]:
             if saved_version < introduced_in:
-                # Warn through the warnings module rather than Output.warning:
-                # Output prefixes each message with a timestamp and pid, which
-                # makes every message unique and defeats the default filter.
-                # Here the message only changes with the saved version, so
-                # Python shows it once per saved version on its own and no
-                # deduplication bookkeeping is needed. stacklevel stays at 1
-                # on purpose: the registry that tracks shown warnings is then
-                # keyed on this file's line, i.e. on the message text alone,
-                # instead of once per calling from_dict.
+                # Use warnings.warn, not Output.warning: otherwise the warning
+                # may show more than once per saved version.
                 warnings.warn(
                     Warnings.MODEL_MIGRATION_APPLIED.format(
                         saved_version=str(saved_version),
