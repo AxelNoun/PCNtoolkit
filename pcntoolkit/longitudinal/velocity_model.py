@@ -140,6 +140,8 @@ class VelocityModel(LongitudinalScore):
         )
         # Step 3: flatten to a long-form DataFrame for inspection and plotting.
         self.thrivelines = thrivelines_to_dataframe(thrive_Z, thrive_X, thrive_Y)
+        # Lets plot_thrivelines put the right covariate on the x-axis.
+        self.thrivelines.attrs["covariate"] = self.covariate
         if save_path is not None:
             self._save_dataframe_csv(self.thrivelines, save_path)
         return self.thrivelines

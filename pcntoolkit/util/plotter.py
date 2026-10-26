@@ -288,7 +288,10 @@ def plot_thrivelines(
         values as ``centiles`` in ``compute_thrivelines`` so every line
         starts on a drawn curve. If None, the model defaults are used.
     covariate : str | None, optional
-        Covariate on the x-axis. Defaults to the first model covariate.
+        Covariate on the x-axis. Defaults to the covariate the thrivelines
+        were computed along (usually age). Needed when that is unknown, e.g.
+        for a table read back from CSV, and the model has more than one
+        covariate.
     covariate_ranges : dict[str, tuple[float, float]] | None, optional
         x-axis range per covariate, e.g. ``{"age": (20, 60)}``. Thrivelines
         outside it are not drawn. Defaults to the ages the thrivelines cover.
@@ -313,19 +316,36 @@ def plot_thrivelines(
     -------
     list[Figure]
         One matplotlib Figure per response variable.
+
+    Raises
+    ------
+    ValueError
+        If ``covariate`` is not given, the table does not record it and the
+        model has more than one covariate.
     """
     validate_thrivelines(thrivelines)
 
+    # The x-axis must be the covariate the lines were computed along; any other
+    # covariate would draw them against the wrong axis.
+    if covariate is None:
+        covariate = thrivelines.attrs.get("covariate")
+    if covariate is None:
+        if len(model.covariates) > 1:
+            raise ValueError(
+                "Cannot tell which covariate the thrivelines were computed "
+                f"along. Pass covariate=, one of {list(model.covariates)}."
+            )
+        covariate = model.covariates[0]
+
     # Default the plotted covariate range to the span the thrivelines cover, so
     # the centiles start and end where the thrivelines do.
-    plot_covariate = covariate if covariate is not None else model.covariates[0]
-    if covariate_ranges is None or plot_covariate not in covariate_ranges:
+    if covariate_ranges is None or covariate not in covariate_ranges:
         wanted = response_vars if response_vars is not None else model.response_vars
         thrive_range = _thriveline_x_range(thrivelines, list(wanted))
         if thrive_range is not None:
             covariate_ranges = {
                 **(covariate_ranges or {}),
-                plot_covariate: thrive_range,
+                covariate: thrive_range,
             }
 
     grid = _build_centile_grid(

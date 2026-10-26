@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 from scipy.stats import norm
 
+from pcntoolkit.longitudinal.correlation_matrix import CorrelationMatrix
 from pcntoolkit.longitudinal.velocity_model import VelocityModel
 from pcntoolkit.math_functions.velocity import (
     _resolve_reference_batch_effects,
@@ -200,7 +201,7 @@ def test_compute_thrivelines_zero_correlation_warns_and_omits_segments(
     # The warning should mention which segments could not be computed.
     assert "0->1, 1->2" in str(caught[0].message)
     assert np.all(np.isnan(thrive_Z.values))
-    # NaN lines are left out of the final table. Both lines failed, 
+    # NaN lines are left out of the final table. Both lines failed,
     # so the table should be empty.
     assert thrivelines_to_dataframe(thrive_Z, thrive_X, thrive_Z).empty
 
@@ -335,3 +336,33 @@ def test_plot_thrivelines_returns_figures(
     assert len(figures) == 1
     for fig in figures:
         plt.close(fig)
+
+
+def test_plot_thrivelines_uses_thriveline_covariate(
+    fitted_norm_blr_model, correlation_matrix_array_factory
+):
+    """Use the thrivelines' covariate on the x-axis of the plot and raise if 
+    this covariate is unknown."""
+    # Thrivelines run along covariate_1, the model's second covariate, so the old
+    # default (first model covariate) would pick the wrong x-axis.
+    matrix = correlation_matrix_array_factory(
+        response_vars=["response_var_0"], covariate="covariate_1"
+    )
+    corr = CorrelationMatrix(matrix, covariate="covariate_1")
+    thrivelines = VelocityModel(fitted_norm_blr_model, corr).compute_thrivelines(
+        centiles=[0.5], covariate_range=(0, 2)
+    )
+
+    figures = plot_thrivelines(
+        fitted_norm_blr_model,
+        thrivelines,
+        response_vars=["response_var_0"],
+        show_figure=False,
+    )
+    assert figures[0].axes[0].get_xlabel() == "covariate_1"
+    plt.close(figures[0])
+
+    # A thriveline table read back from CSV has lost its attrs, so the covariate is unknown.
+    thrivelines.attrs = {}
+    with pytest.raises(ValueError, match="covariate="):
+        plot_thrivelines(fitted_norm_blr_model, thrivelines, show_figure=False)
