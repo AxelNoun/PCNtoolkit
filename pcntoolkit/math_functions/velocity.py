@@ -327,7 +327,7 @@ def thriveline_end_z(
     return r * start_z + math.sqrt(1.0 - r**2) * zgain_threshold
 
 
-def compute_thrivelines(
+def compute_thriveline_z(
     R: xr.DataArray,
     *,
     zgain_threshold: float = -1.96,
@@ -522,9 +522,9 @@ def compute_thriveline_y(
         Fitted normative model providing scalers and regional ``backward``
         maps.
     thrive_Z : xr.DataArray or xr.Dataset
-        Propagated z-scores from ``compute_thrivelines``, with dimensions
+        Propagated z-scores from ``compute_thriveline_z``, with dimensions
         ``(segment, response_vars, offset)``. When an ``xr.Dataset`` is
-        passed (e.g. from ``VelocityModel.get_thrivelines``),
+        passed (e.g. from ``VelocityModel.compute_thrivelines``),
         it must contain data variables ``Z`` and ``X``; ``thrive_X`` may then
         be omitted.
     thrive_X : xr.DataArray, optional
@@ -653,13 +653,13 @@ def validate_thrivelines(thrivelines: pd.DataFrame) -> None:
     if not isinstance(thrivelines, pd.DataFrame):
         raise TypeError(
             "thrivelines must be a pandas DataFrame from "
-            "VelocityModel.get_thrivelines()."
+            "VelocityModel.compute_thrivelines()."
         )
     missing = [col for col in THRIVELINE_DF_COLUMNS if col not in thrivelines.columns]
     if missing:
         raise ValueError(
             f"thrivelines is missing columns {missing}. "
-            "Compute it with VelocityModel.get_thrivelines() first."
+            "Compute it with VelocityModel.compute_thrivelines() first."
         )
 
 
@@ -678,7 +678,7 @@ def thrivelines_to_dataframe(
     ----------
     thrive_Z, thrive_X, thrive_Y : xr.DataArray
         Arrays with dimensions ``(segment, response_vars, offset)`` as returned
-        by ``compute_thrivelines`` and ``compute_thriveline_y``.
+        by ``compute_thriveline_z`` and ``compute_thriveline_y``.
 
     Returns
     -------
@@ -687,7 +687,7 @@ def thrivelines_to_dataframe(
         plotting.
     """
     rows: list[dict[str, object]] = []
-    # Segment-level anchor metadata attached by compute_thrivelines.
+    # Segment-level anchor metadata attached by compute_thriveline_z.
     start_ages = (
         thrive_Z.coords["start_age"].values if "start_age" in thrive_Z.coords else None
     )

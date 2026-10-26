@@ -296,7 +296,8 @@ data as your normative model.
     axes[0].grid(False)
     fig.colorbar(image, ax=axes[0], label="correlation")
     
-    axes[1].plot(gaps, [corr.get(REGION, age, age + gap) for gap in gaps], marker="o")
+    # CorrelationMatrix.get_correlation() reads a correlation between two specific ages for one response variable.
+    axes[1].plot(gaps, [corr.get_correlation(REGION, age, age + gap) for gap in gaps], marker="o")
     axes[1].set_xlabel(f"Years after age {age}")
     axes[1].set_ylabel("correlation")
     axes[1].set_title(f"Correlation with the z-score at age {age}")
@@ -647,8 +648,8 @@ still changing as expected:
 Below we draw the patient with the most negative z-gain (red) and the
 control with the most typical change (blue).
 
-``VelocityModel.get_thrivelines()`` computes the thrivelines from the
-correlation matrix, and ``plot_thrivelines()`` draws them on the
+``VelocityModel.compute_thrivelines()`` computes the thrivelines from
+the correlation matrix, and ``plot_thrivelines()`` draws them on the
 normative model’s centile chart.
 
 .. code:: ipython3
@@ -658,7 +659,7 @@ normative model’s centile chart.
     youngest, oldest = int(lnm_ages.min()), int(lnm_ages.max()) + 1
     
     # Compute thrivelines
-    thrivelines = velocity.get_thrivelines(
+    thrivelines = velocity.compute_thrivelines(
         centiles=CENTILES,  # thrivelines start on these centile curves
         covariate_range=(youngest, oldest),
         zgain_threshold=-1.96  # -1.96: largest expected decline; +1.96: largest expected increase

@@ -9,7 +9,7 @@ import xarray as xr
 
 from pcntoolkit.math_functions.velocity import (
     compute_thriveline_y,
-    compute_thrivelines,
+    compute_thriveline_z,
     thrivelines_to_dataframe,
 )
 
@@ -23,22 +23,10 @@ if TYPE_CHECKING:
 
 
 class VelocityModel(LongitudinalScore):
-    """z-gain scores and thrivelines (Bayer et al., 2026, preprint).
-
-    The z-gain asks: given a person's z-score at the earlier visit, is their
-    z-score at the later visit surprising? With ``r`` the correlation of
-    z-scores between the two ages,
-
-        z_gain = (z_later − r·z_earlier) / sqrt(1 − r²)
-
-    Example: z-scores of -0.5 then -2.0, with r = 0.9, give
-    z_gain = (-2.0 + 0.45) / 0.44 ≈ -3.6, a decline far larger than expected
-    (beyond -1.96).
+    """Velocity model introduced by Bayer et al., 2026 (preprint).
 
     It works with any regression model and any number of visits. With more
     than two visits, only the last two are used.
-    TODO: Discuss with Johanna if this choice makes sense.
-
     TODO: Using on the full visit history and not only the most recent
     transition can be done with ``conditional_forecast()``
 
@@ -55,7 +43,7 @@ class VelocityModel(LongitudinalScore):
     zgain : xr.DataArray | None
         Last result of ``score``, or ``None`` before the first call.
     thrivelines : pd.DataFrame | None
-        Last result of ``get_thrivelines``, or ``None`` before the first call.
+        Last result of ``compute_thrivelines``, or ``None`` before the first call.
     """
 
     def __init__(
@@ -72,10 +60,10 @@ class VelocityModel(LongitudinalScore):
         # Hold the most recent z-gain scores; filled in by score().
         self.zgain: xr.DataArray | None = None
 
-        # Hold the most recent thrivelines; filled in by get_thrivelines().
+        # Hold the most recent thrivelines; filled in by compute_thrivelines().
         self.thrivelines: pd.DataFrame | None = None
 
-    def get_thrivelines(
+    def compute_thrivelines(
         self,
         *,
         zgain_threshold: float = -1.96,
@@ -140,9 +128,7 @@ class VelocityModel(LongitudinalScore):
             not strictly between 0 and 1.
         """
         # Step 1: compute the start and end z-score of every line.
-        # This bare name resolves to the imported velocity function (a module
-        # global), not to this method, so it is not a recursive call.
-        thrive_Z, thrive_X = compute_thrivelines(
+        thrive_Z, thrive_X = compute_thriveline_z(
             self.correlation_matrix.matrix,
             zgain_threshold=zgain_threshold,
             thriveline_span=thriveline_span,
@@ -239,9 +225,9 @@ class VelocityModel(LongitudinalScore):
                 age_prev = int(round(ages[obs_prev]))
                 age_last = int(round(ages[obs_last]))
 
-                # Read the correlation for this visit pair. get() clamps the
+                # Read the correlation for this visit pair. get_correlation() clamps the
                 # ages to the matrix and keeps the denominator away from zero.
-                r = self.correlation_matrix.get(rv, age_prev, age_last)
+                r = self.correlation_matrix.get_correlation(rv, age_prev, age_last)
                 denominator = np.sqrt(1.0 - r**2)
                 # Compute zgain
                 scores[subject_index[subject], j] = (z_rv[obs_last] - r * z_rv[obs_prev]) / denominator

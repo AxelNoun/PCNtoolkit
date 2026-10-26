@@ -12,7 +12,7 @@ from scipy.stats import norm
 
 from pcntoolkit.math_functions.velocity import (
     _resolve_reference_batch_effects,
-    compute_thrivelines,
+    compute_thriveline_z,
     thriveline_end_z,
     thrivelines_to_dataframe,
 )
@@ -57,12 +57,12 @@ def test_thriveline_end_z_has_zgain_threshold():
 def test_compute_thrivelines_rejects_non_positive_thriveline_span():
     R = _make_correlation_matrix()
     with pytest.raises(ValueError, match="thriveline_span"):
-        compute_thrivelines(R, thriveline_span=0)
+        compute_thriveline_z(R, thriveline_span=0)
 
 
 def test_compute_thrivelines_output_structure():
     R = _make_correlation_matrix(max_age=3, response_vars=["metric_a", "metric_b"])
-    thrive_Z, thrive_X = compute_thrivelines(
+    thrive_Z, thrive_X = compute_thriveline_z(
         R,
         thriveline_span=1,
         thriveline_spacing=1,
@@ -79,7 +79,7 @@ def test_compute_thrivelines_output_structure():
 
 def test_compute_thrivelines_propagates_with_known_correlation():
     R = _make_correlation_matrix(max_age=2, offset_correlations={1: 0.8})
-    thrive_Z, thrive_X = compute_thrivelines(
+    thrive_Z, thrive_X = compute_thriveline_z(
         R,
         thriveline_span=1,
         thriveline_spacing=1,
@@ -103,7 +103,7 @@ def test_compute_thrivelines_propagates_with_known_correlation():
 
 def test_compute_thrivelines_starts_at_given_centiles():
     R = _make_correlation_matrix(max_age=2, offset_correlations={1: 0.8})
-    thrive_Z, _ = compute_thrivelines(
+    thrive_Z, _ = compute_thriveline_z(
         R,
         centiles=[0.05, 0.5],
         covariate_range=(0, 1),
@@ -118,7 +118,7 @@ def test_compute_thrivelines_zero_correlation_warns_and_omits_segments():
     R = _make_correlation_matrix(max_age=3, offset_correlations={1: 0.0})
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        thrive_Z, _ = compute_thrivelines(
+        thrive_Z, _ = compute_thriveline_z(
             R,
             thriveline_span=1,
             centiles=[0.5],
@@ -133,7 +133,7 @@ def test_compute_thrivelines_zero_correlation_warns_and_omits_segments():
 
 def test_compute_thrivelines_respects_covariate_range():
     R = _make_correlation_matrix(max_age=5, offset_correlations={1: 0.8})
-    thrive_Z, thrive_X = compute_thrivelines(
+    thrive_Z, thrive_X = compute_thriveline_z(
         R,
         covariate_range=(1, 2),
         centiles=[0.5],
@@ -176,7 +176,7 @@ def test_resolve_reference_batch_effects_without_counts():
 
 def test_thrivelines_to_dataframe_long_format():
     R = _make_correlation_matrix(max_age=2, offset_correlations={1: 0.8})
-    thrive_Z, thrive_X = compute_thrivelines(
+    thrive_Z, thrive_X = compute_thriveline_z(
         R,
         centiles=[0.5, 0.84],
         covariate_range=(0, 1),

@@ -23,7 +23,7 @@ VALID_CSV = (
 # Formatting is off to keep one CSV row per line, so each matrix reads as a grid.
 # fmt: off
 INVALID_CSVS = {
-    # Ages must run 0, 1, ..., N-1, because get() reads cells by position.
+    # Ages must run 0, 1, ..., N-1, because get_correlation() reads cells by position.
     "ages_not_from_0": (
         b",5,6,7\n"
         b"5,1.0,0.5,0.0\n"
@@ -203,32 +203,33 @@ def test_invalid_max_correlation(correlation_matrix_array_factory):
     ],
     ids=["forward", "symmetric", "clamp_low", "clamp_high"],
 )
-def test_get_clamps_ages(
+def test_get_correlation_clamps_ages(
     correlation_matrix,
     age_1,
     age_2,
     expected_r,
 ):
-    assert correlation_matrix.get("metric_a", age_1, age_2) == pytest.approx(expected_r)
+    r = correlation_matrix.get_correlation("metric_a", age_1, age_2)
+    assert r == pytest.approx(expected_r)
 
 
-def test_get_respects_max_correlation(
+def test_get_correlation_respects_max_correlation(
     correlation_matrix_array_factory,
 ):
     matrix = correlation_matrix_array_factory(offset_correlations={1: 0.999})
     corr = CorrelationMatrix(matrix, max_correlation=0.5)
-    assert corr.get("metric_a", 0, 1) == pytest.approx(0.5)
+    assert corr.get_correlation("metric_a", 0, 1) == pytest.approx(0.5)
 
 
-def test_get_warns_outside_estimated_range(correlation_matrix):
+def test_get_correlation_warns_outside_estimated_range(correlation_matrix):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        correlation_matrix.get("metric_a", 99, 100)
+        correlation_matrix.get_correlation("metric_a", 99, 100)
 
     assert len(caught) == 1
     assert issubclass(caught[0].category, UserWarning)
 
 
-def test_get_unknown_response_var_raises(correlation_matrix):
+def test_get_correlation_unknown_response_var_raises(correlation_matrix):
     with pytest.raises(KeyError, match="metric_b"):
-        correlation_matrix.get("metric_b", 0, 1)
+        correlation_matrix.get_correlation("metric_b", 0, 1)

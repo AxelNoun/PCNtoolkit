@@ -284,10 +284,10 @@ def plot_thrivelines(
     model : NormativeModel
         The model used to draw the centile curves.
     thrivelines : pd.DataFrame
-        Table from ``VelocityModel.get_thrivelines``.
+        Table from ``VelocityModel.compute_thrivelines``.
     centiles : list[float] | np.ndarray | None, optional
         Centile curves to draw, e.g. ``[0.05, 0.5, 0.95]``. Use the same
-        values as ``centiles`` in ``get_thrivelines`` so every line
+        values as ``centiles`` in ``compute_thrivelines`` so every line
         starts on a drawn curve. If None, the model defaults are used.
     covariate : str | None, optional
         Covariate on the x-axis. Defaults to the first model covariate.

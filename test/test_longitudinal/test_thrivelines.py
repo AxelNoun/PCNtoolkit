@@ -1,4 +1,4 @@
-"""Tests for thriveline utilities, VelocityModel.get_thrivelines, and
+"""Tests for thriveline utilities, VelocityModel.compute_thrivelines, and
 plot_thrivelines."""
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from scipy.stats import norm
 from pcntoolkit.longitudinal.velocity_model import VelocityModel
 from pcntoolkit.math_functions.velocity import (
     _resolve_reference_batch_effects,
-    compute_thrivelines,
+    compute_thriveline_z,
     thrivelines_to_dataframe,
 )
 from pcntoolkit.util.plotter import plot_thrivelines
@@ -23,7 +23,7 @@ from pcntoolkit.util.plotter import plot_thrivelines
 
 def test_compute_thrivelines_negative_correlation(correlation_matrix_array_factory):
     matrix = correlation_matrix_array_factory(max_age=3, offset_correlations={1: -0.5})
-    thrive_Z, _ = compute_thrivelines(
+    thrive_Z, _ = compute_thriveline_z(
         matrix,
         centiles=[0.5],
         covariate_range=(0, 1),
@@ -34,7 +34,7 @@ def test_compute_thrivelines_negative_correlation(correlation_matrix_array_facto
 
 def test_compute_thrivelines_respects_spacing(correlation_matrix_array_factory):
     matrix = correlation_matrix_array_factory(max_age=4, offset_correlations={1: 0.8})
-    thrive_Z, _ = compute_thrivelines(
+    thrive_Z, _ = compute_thriveline_z(
         matrix,
         thriveline_spacing=2,
         centiles=[0.5],
@@ -45,7 +45,7 @@ def test_compute_thrivelines_respects_spacing(correlation_matrix_array_factory):
 
 def test_compute_thrivelines_span_of_two(correlation_matrix_array_factory):
     matrix = correlation_matrix_array_factory(max_age=4, offset_correlations={2: 0.7})
-    thrive_Z, thrive_X = compute_thrivelines(
+    thrive_Z, thrive_X = compute_thriveline_z(
         matrix,
         thriveline_span=2,
         centiles=[0.84],
@@ -63,7 +63,7 @@ def test_thrivelines_to_dataframe_multiple_response_vars(
         response_vars=["metric_a", "metric_b"],
         offset_correlations={1: 0.8},
     )
-    thrive_Z, thrive_X = compute_thrivelines(
+    thrive_Z, thrive_X = compute_thriveline_z(
         matrix,
         centiles=[0.5],
         covariate_range=(0, 1),
@@ -74,12 +74,12 @@ def test_thrivelines_to_dataframe_multiple_response_vars(
     assert set(df["response_var"]) == {"metric_a", "metric_b"}
 
 
-def test_zgain_get_thrivelines_overwrites_cache(
+def test_zgain_compute_thrivelines_overwrites_cache(
     fitted_norm_blr_model, blr_correlation_matrix
 ):
     scorer = VelocityModel(fitted_norm_blr_model, blr_correlation_matrix)
-    first = scorer.get_thrivelines(centiles=[0.5], covariate_range=(0, 1))
-    second = scorer.get_thrivelines(centiles=[0.84, 0.98], covariate_range=(0, 2))
+    first = scorer.compute_thrivelines(centiles=[0.5], covariate_range=(0, 1))
+    second = scorer.compute_thrivelines(centiles=[0.84, 0.98], covariate_range=(0, 2))
     assert scorer.thrivelines is second
     assert len(second) != len(first) or not first.equals(second)
 
@@ -98,7 +98,7 @@ def test_compute_thrivelines_rejects_non_positive_thriveline_span(
     synthetic_correlation_matrix,
 ):
     with pytest.raises(ValueError, match="thriveline_span"):
-        compute_thrivelines(synthetic_correlation_matrix, thriveline_span=0)
+        compute_thriveline_z(synthetic_correlation_matrix, thriveline_span=0)
 
 
 def test_compute_thrivelines_output_structure(correlation_matrix_array_factory):
@@ -106,7 +106,7 @@ def test_compute_thrivelines_output_structure(correlation_matrix_array_factory):
         max_age=3,
         response_vars=["metric_a", "metric_b"],
     )
-    thrive_Z, thrive_X = compute_thrivelines(
+    thrive_Z, thrive_X = compute_thriveline_z(
         matrix,
         thriveline_span=1,
         thriveline_spacing=1,
@@ -125,7 +125,7 @@ def test_compute_thrivelines_propagates_with_known_correlation(
     correlation_matrix_array_factory,
 ):
     matrix = correlation_matrix_array_factory(max_age=2, offset_correlations={1: 0.8})
-    thrive_Z, thrive_X = compute_thrivelines(
+    thrive_Z, thrive_X = compute_thriveline_z(
         matrix,
         thriveline_span=1,
         thriveline_spacing=1,
@@ -151,7 +151,7 @@ def test_compute_thrivelines_starts_at_given_centiles(
     correlation_matrix_array_factory,
 ):
     matrix = correlation_matrix_array_factory(max_age=2, offset_correlations={1: 0.8})
-    thrive_Z, _ = compute_thrivelines(
+    thrive_Z, _ = compute_thriveline_z(
         matrix,
         centiles=[0.05, 0.5],
         covariate_range=(0, 1),
@@ -164,7 +164,7 @@ def test_compute_thrivelines_starts_at_given_centiles(
 
 def test_compute_thrivelines_default_centiles(correlation_matrix_array_factory):
     matrix = correlation_matrix_array_factory(max_age=2, offset_correlations={1: 0.8})
-    thrive_Z, _ = compute_thrivelines(matrix, covariate_range=(0, 1))
+    thrive_Z, _ = compute_thriveline_z(matrix, covariate_range=(0, 1))
 
     np.testing.assert_allclose(
         np.unique(thrive_Z.coords["start_z"].values),
@@ -178,7 +178,7 @@ def test_compute_thrivelines_rejects_centiles_outside_0_1(
 ):
     matrix = correlation_matrix_array_factory(max_age=2, offset_correlations={1: 0.8})
     with pytest.raises(ValueError, match="centiles"):
-        compute_thrivelines(matrix, centiles=[0.5, bad_centile])
+        compute_thriveline_z(matrix, centiles=[0.5, bad_centile])
 
 
 def test_compute_thrivelines_zero_correlation_warns_and_omits_segments(
@@ -187,7 +187,7 @@ def test_compute_thrivelines_zero_correlation_warns_and_omits_segments(
     matrix = correlation_matrix_array_factory(max_age=3, offset_correlations={1: 0.0})
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        thrive_Z, _ = compute_thrivelines(
+        thrive_Z, _ = compute_thriveline_z(
             matrix,
             thriveline_span=1,
             centiles=[0.5],
@@ -202,7 +202,7 @@ def test_compute_thrivelines_zero_correlation_warns_and_omits_segments(
 
 def test_compute_thrivelines_respects_covariate_range(correlation_matrix_array_factory):
     matrix = correlation_matrix_array_factory(max_age=5, offset_correlations={1: 0.8})
-    thrive_Z, thrive_X = compute_thrivelines(
+    thrive_Z, thrive_X = compute_thriveline_z(
         matrix,
         covariate_range=(1, 2),
         centiles=[0.5],
@@ -237,7 +237,7 @@ def test_resolve_reference_batch_effects_without_counts():
 
 def test_thrivelines_to_dataframe_long_format(correlation_matrix_array_factory):
     matrix = correlation_matrix_array_factory(max_age=2, offset_correlations={1: 0.8})
-    thrive_Z, thrive_X = compute_thrivelines(
+    thrive_Z, thrive_X = compute_thriveline_z(
         matrix,
         centiles=[0.5, 0.84],
         covariate_range=(0, 1),
@@ -264,11 +264,11 @@ def test_thrivelines_to_dataframe_long_format(correlation_matrix_array_factory):
     assert df.attrs.get("thriveline_span") == 1
 
 
-def test_zgain_get_thrivelines_returns_dataframe(
+def test_zgain_compute_thrivelines_returns_dataframe(
     fitted_norm_blr_model, blr_correlation_matrix
 ):
     scorer = VelocityModel(fitted_norm_blr_model, blr_correlation_matrix)
-    thrivelines = scorer.get_thrivelines(
+    thrivelines = scorer.compute_thrivelines(
         centiles=[0.5, 0.84],
         covariate_range=(0, 2),
     )
@@ -287,13 +287,13 @@ def test_zgain_get_thrivelines_returns_dataframe(
     assert not thrivelines.empty
 
 
-def test_zgain_get_thrivelines_saved_csv_matches_returned_dataframe(
+def test_zgain_compute_thrivelines_saved_csv_matches_returned_dataframe(
     tmp_path, fitted_norm_blr_model, blr_correlation_matrix
 ):
     scorer = VelocityModel(fitted_norm_blr_model, blr_correlation_matrix)
     save_path = tmp_path / "thrivelines.csv"
 
-    thrivelines = scorer.get_thrivelines(
+    thrivelines = scorer.compute_thrivelines(
         centiles=[0.5, 0.84],
         covariate_range=(0, 2),
         save_path=save_path,
@@ -309,7 +309,7 @@ def test_plot_thrivelines_returns_figures(
     blr_correlation_matrix,
 ):
     scorer = VelocityModel(fitted_norm_blr_model, blr_correlation_matrix)
-    thrivelines = scorer.get_thrivelines(
+    thrivelines = scorer.compute_thrivelines(
         centiles=[0.5],
         covariate_range=(0, 2),
     )

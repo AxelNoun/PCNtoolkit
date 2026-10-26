@@ -60,8 +60,8 @@ class CorrelationMatrix:
     bandwidth : int, optional
         Widest age gap that has a correlation. Wider gaps are 0.
     max_correlation : float, default 0.99
-        Cap on correlations read with ``get``, so the z-gain never divides by
-        zero.
+        Cap on correlations read with ``get_correlation``, so the z-gain never
+        divides by zero (as it divides by sqrt(1 - r²))
     n_subjects : int, optional
         Number of subjects the matrix was estimated from.
     estimated_range : tuple of int, optional
@@ -114,22 +114,18 @@ class CorrelationMatrix:
         .. warning::
            This method is still under development and might change in the future.
 
-        For every pair of ages, this correlates the z-scores of people
-        scanned at both ages. Usually these are healthy controls.
-
         Parameters
         ----------
         data : NormData
             Subjects with two or more visits and z-scores already predicted.
         bandwidth : int, default 5
-            Widest age gap, in years, that gets a correlation. With 5, ages 40
-            and 45 get one, but 40 and 46 are set to 0. In the matrix plot this
-            is the width of the coloured band along the diagonal.
+            Widest age gap, in years, to estimate correlations for.
+            Correlations for wider gaps are set to 0.
         covariate : str, default "age"
-            Covariate the matrix is indexed by.
+            Covariate to compute correlations over.
         max_correlation : float, default 0.99
-            Cap on correlations read with ``get``, so the z-gain never divides
-            by zero.
+            Cap on correlations read with ``get_correlation``, so the z-gain
+            never divides by zero.
 
         Returns
         -------
@@ -195,7 +191,7 @@ class CorrelationMatrix:
         covariate : str, default "age"
             Covariate the matrix is indexed by.
         max_correlation : float, default 0.99
-            Upper bound applied by ``get``.
+            Upper bound applied by ``get_correlation``.
 
         Returns
         -------
@@ -231,8 +227,8 @@ class CorrelationMatrix:
             # round_trip parsing: the default parser is a hair imprecise, which
             # would make a loaded matrix score differently from the saved one.
             df = pd.read_csv(csv_path, index_col=0, float_precision="round_trip")
-            # get() reads cells by position, so covariate value c must sit in
-            # row c and column c.
+            # get_correlation() reads cells by position, so covariate value c
+            # must sit in row c and column c.
             expected = [str(c) for c in range(len(df))]
             if list(df.columns) != expected or list(df.index.astype(str)) != expected:
                 raise ValueError(
@@ -436,10 +432,12 @@ class CorrelationMatrix:
             # Keep full precision and use \n line endings on every OS.
             df.to_csv(directory / f"{response_var}.csv", lineterminator="\n")
 
-    def get(self, response_var: str, timepoint_1: int, timepoint_2: int) -> float:
+    def get_correlation(
+        self, response_var: str, timepoint_1: int, timepoint_2: int
+    ) -> float:
         """Read the correlation between two ages for one region.
 
-        For example, ``corr.get("lh_thickness", 40, 41)`` is how strongly a
+        For example, ``corr.get_correlation("lh_thickness", 40, 41)`` is how strongly a
         z-score at age 40 predicts the z-score at age 41. Ages beyond the
         matrix are moved to its nearest edge.
 
@@ -453,8 +451,8 @@ class CorrelationMatrix:
         Returns
         -------
         float
-            The correlation, capped at ``max_correlation`` (default 0.99) so the
-            z-gain never divides by zero.
+            The correlation, kept between ``-max_correlation`` and
+            ``+max_correlation`` (default 0.99).
 
         Raises
         ------
