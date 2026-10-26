@@ -98,7 +98,7 @@ class VelocityModel(LongitudinalScore):
             Defaults to ``[0.05, 0.25, 0.5, 0.75, 0.95]``.
         covariate_range : tuple of int, optional
             ``(min, max)`` ages to draw lines for, e.g. ``(20, 60)``. Defaults
-            to every age in the correlation matrix.
+            to the ages the normative model was trained on.
         save_path : str | PathLike[str] | None, optional
             If set, also save the table to this CSV file.
 
@@ -122,6 +122,8 @@ class VelocityModel(LongitudinalScore):
             If ``thriveline_span`` is not positive, or if a centile is
             not strictly between 0 and 1.
         """
+        if covariate_range is None:
+            covariate_range = self._default_covariate_range()
         # Step 1: compute the start and end z-score of every line.
         thrive_Z, thrive_X = compute_thriveline_z(
             self.correlation_matrix.matrix,
@@ -145,6 +147,46 @@ class VelocityModel(LongitudinalScore):
         if save_path is not None:
             self._save_dataframe_csv(self.thrivelines, save_path)
         return self.thrivelines
+
+    def _default_covariate_range(self) -> tuple[int, int]:
+        """Pick the covariate range of the user's normative model to plot thrivelines
+        and not the correlation matrix's full range.
+
+        Useful when the user loads a correlation matrix that has a wider time range than
+        the user's normative model was trained on.
+
+        Returns
+        -------
+        tuple of int
+            ``(min, max)`` timepoints the normative model was trained on, limited to
+            the timepoints the correlation matrix covers.
+
+        Raises
+        ------
+        ValueError
+            If that range does not overlap at all with the time range of the
+            correlation matrix.
+        """
+        matrix_ages = self.correlation_matrix.matrix[f"{self.covariate}_1"].values
+        matrix_min, matrix_max = int(matrix_ages.min()), int(matrix_ages.max())
+
+        model_ranges = self.normative_model.covariate_ranges or {}
+        if self.covariate not in model_ranges:
+            # Models saved without covariate ranges: keep the old behaviour.
+            return matrix_min, matrix_max
+        # Widen to whole years, as the matrix is indexed by integer ages.
+        low = int(np.floor(model_ranges[self.covariate]["min"]))
+        high = int(np.ceil(model_ranges[self.covariate]["max"]))
+
+        if max(low, matrix_min) >= min(high, matrix_max):
+            raise ValueError(
+                f"The normative model's {self.covariate} range ({low}-{high}) does not "
+                f"overlap the correlation matrix ({matrix_min}-{matrix_max}), so "
+                f"there are no {self.covariate} values to draw thrivelines for. Use "
+                f"a correlation matrix that covers the {self.covariate} values of "
+                "the normative model."
+            )
+        return max(low, matrix_min), min(high, matrix_max)
 
     def score(
         self,
