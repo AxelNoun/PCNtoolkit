@@ -275,9 +275,7 @@ def plot_thrivelines(
 ) -> list[Figure]:
     """Draw the centile chart with thrivelines on top.
 
-    Each thriveline is a short blue line starting on a centile curve. A
-    person who starts on that curve and ends up beyond the line has changed
-    more than expected.
+    Each thriveline is a short blue line starting on a centile curve.
 
     Parameters
     ----------
@@ -293,8 +291,7 @@ def plot_thrivelines(
         Covariate on the x-axis. Defaults to the first model covariate.
     covariate_ranges : dict[str, tuple[float, float]] | None, optional
         x-axis range per covariate, e.g. ``{"age": (20, 60)}``. Thrivelines
-        outside it are not drawn. Defaults to the ages the thrivelines cover;
-        any other covariate defaults to its range in the model.
+        outside it are not drawn. Defaults to the ages the thrivelines cover.
     response_vars : list[str] | None, optional
         Response variables to plot. Defaults to all model response variables.
     batch_effects : dict[str, list[str]] | None | Literal["all"], optional

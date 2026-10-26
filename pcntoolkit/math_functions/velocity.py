@@ -305,9 +305,6 @@ def thriveline_end_z(
 
         z_end = r · z_start + sqrt(1 − r²) · zgain_threshold
 
-    Example: with ``r = 0.8``, ``start_z = 0`` and ``zgain_threshold = -1.96``,
-    ``z_end = 0.6 · -1.96 ≈ -1.18``.
-
     Parameters
     ----------
     r : float
@@ -316,8 +313,7 @@ def thriveline_end_z(
     start_z : float
         z-score where the line starts.
     zgain_threshold : float, default -1.96
-        z-gain the line follows. -1.96 marks the largest decline that is still
-        expected, +1.96 the largest rise.
+        z-gain the line follows.
 
     Returns
     -------
@@ -338,30 +334,21 @@ def compute_thriveline_z(
 ) -> tuple[xr.DataArray, xr.DataArray]:
     """Compute thrivelines, in z-scores, from a correlation matrix.
 
-    Each thriveline is a short line segment. It starts on a centile curve and
-    ends where a person would land after ``thriveline_span`` years with a
-    z-gain of exactly ``zgain_threshold``.
-
     Parameters
     ----------
     R : xr.DataArray
         Correlation matrix with dimensions
-        ``(response_vars, <covariate>_1, <covariate>_2)``. Ages with a zero or
+        ``(response_vars, <covariate>_1, <covariate>_2)``. Timepoints with a zero or
         missing correlation get no thriveline, and a warning is raised.
     zgain_threshold : float, default -1.96
-        z-gain each line follows. -1.96: the line slopes down to the largest
-        decline that is still expected. +1.96: it slopes up to the largest
-        rise that is still expected. Called zα in Bayer et al. (2026).
+        z-gain each line follows.
     thriveline_span : int, default 1
-        How far each thriveline stretches along the x-axis, in years. With
-        2, a thriveline starting at age 40 ends at 42.
+        How far each thriveline stretches along the x-axis.
     thriveline_spacing : int, default 1
-        Years between neighbouring thrivelines along the x-axis. With 2,
-        thrivelines start at ages 20, 22, 24, ...
+        Years between neighbouring thrivelines along the x-axis.
     centiles : array-like of float, optional
         Centile curves the lines start on, between 0 and 1. Defaults to
-        ``[0.05, 0.25, 0.5, 0.75, 0.95]``, the curves ``plot_thrivelines``
-        draws by default.
+        ``[0.05, 0.25, 0.5, 0.75, 0.95]``.
     covariate_range : tuple of int, optional
         ``(min, max)`` ages to draw lines for. Defaults to every age in ``R``.
 
@@ -378,7 +365,7 @@ def compute_thriveline_z(
         If ``thriveline_span`` is not positive, or if a centile is not
         strictly between 0 and 1.
     """
-    # Reject non-positive spans because a line must move forward in age.
+    # Reject non-positive spans because a line must move forward in time.
     if thriveline_span <= 0:
         raise ValueError("thriveline_span must be > 0.")
 
@@ -388,8 +375,7 @@ def compute_thriveline_z(
     # The 0th and 100th centiles map to infinite z-scores.
     if np.any((centiles <= 0) | (centiles >= 1)):
         raise ValueError(
-            "centiles must be strictly between 0 and 1, "
-            f"got {centiles.tolist()}."
+            f"centiles must be strictly between 0 and 1, got {centiles.tolist()}."
         )
 
     # Ensure R carries a response_vars dimension and collect its labels.
@@ -508,44 +494,35 @@ def compute_thriveline_y(
     covariate: str | None = None,
     batch_effects: dict[str, str] | None = None,
 ) -> xr.DataArray:
-    """Map propagated Z thrivelines to response-scale Y coordinates.
+    """Convert thrivelines from z-scores to the response-variable Y coordinates.
 
-    For each thriveline segment, response variable, and offset, covariate
-    values are taken from ``thrive_X``, the remaining covariates are held
-    fixed, and ``model[response_var].backward`` converts z-scores to ``Y`` at
-    the reference batch effect (when present).
+    Uses the normative model to turn each point's (age, z-score) into the
+    value on the y-axis of the centile chart, e.g. cortical thickness in mm.
 
     Parameters
     ----------
     model : NormativeModel
-        Fitted normative model providing scalers and regional ``backward``
-        maps.
+        The fitted normative model.
     thrive_Z : xr.DataArray or xr.Dataset
-        Propagated z-scores from ``compute_thriveline_z``, with dimensions
-        ``(segment, response_vars, offset)``. When an ``xr.Dataset`` is
-        passed (e.g. from ``VelocityModel.compute_thrivelines``),
-        it must contain data variables ``Z`` and ``X``; ``thrive_X`` may then
-        be omitted.
+        Z-scores from ``compute_thriveline_z``, with dimensions
+        ``(segment, response_vars, offset)``. Can also be a Dataset holding
+        both ``Z`` and ``X``; ``thrive_X`` can then be left out.
     thrive_X : xr.DataArray, optional
-        Matching covariate coordinates, same shape as ``thrive_Z``. Required
-        when ``thrive_Z`` is not a Dataset with ``Z`` and ``X``.
+        Ages from ``compute_thriveline_z``, same shape as ``thrive_Z``.
     covariate : str, optional
-        Covariate along which thrivelines advance (e.g. ``"age"``). Required
-        when the model has more than one covariate; otherwise the sole model
-        covariate is used.
+        Name of the covariate on the x-axis, e.g. ``"age"``. Only needed
+        when the model has more than one covariate. That way it knows to put 
+        all other covariates at the middle of their range.
     batch_effects : dict of str, optional
-        Reference batch labels keyed by batch-effect dimension
-        (e.g. ``{"site": "A"}``). When omitted or incomplete, missing keys
-        are filled from the first allowed level in
-        ``model.unique_batch_effects`` (same rule as
-        ``plot_thrivelines``). Ignored when
-        the model has no batch effects.
+        Batch effect level to draw the lines for, e.g. ``{"site": "A"}``.
+        Defaults to the level that appears first in the model's training
+        data. Ignored when the model has no batch effects.
 
     Returns
     -------
     thrive_Y : xr.DataArray
-        Response-scale thriveline values with the same dimensions and
-        coordinates as ``thrive_Z``.
+        Response variable value at each point, same dimensions as ``thrive_Z``. Lines
+        that could not be computed stay NaN.
     """
     # Identify the covariate that advances along each thriveline segment.
     covariates = list(model.covariates)

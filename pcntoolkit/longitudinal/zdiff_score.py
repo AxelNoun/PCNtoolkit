@@ -20,21 +20,6 @@ if TYPE_CHECKING:
 class ZDiffScore(LongitudinalScore):
     """Two-visit z-diff score (Rehák Bučková et al., 2025).
 
-    The z-diff asks whether a person changed more between two visits than the
-    model expects. It takes the change in the person's distance from the
-    model's prediction (their residual),
-
-        Δr = (y₂ - ŷ₂) - (y₁ - ŷ₁)
-
-    and divides it by how much that change usually varies in
-    ``reference_data`` (typically healthy controls)::
-
-        z_diff = Δr / SD(Δr in reference_data)
-
-    Near 0: changed as expected. Below -1.96 or above +1.96: an unusually
-    large decline or rise. Works only with BLR models and two visits per
-    subject.
-
     Parameters
     ----------
     normative_model : NormativeModel
@@ -73,7 +58,7 @@ class ZDiffScore(LongitudinalScore):
         score_data: NormData,
         save_path: str | PathLike[str] | None = None,
     ) -> xr.DataArray:
-        """Compute one z-diff per subject and brain region.
+        """Compute one z-diff per subject and response variable.
 
         Parameters
         ----------
