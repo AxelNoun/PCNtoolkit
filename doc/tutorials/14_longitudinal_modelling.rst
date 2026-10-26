@@ -20,8 +20,8 @@ What you need
    dataset (``LNM_data.csv``), loaded with ``load_lnm()``.
 2. **A correlation matrix** (used for velocity models): load a
    precomputed one (recommended, used here) or estimate one from your
-   own longitudinal data (we have a separate tutorial for that; needs
-   thousands of subjects with longitudinal data).
+   own longitudinal data (needs thousands of subjects with longitudinal
+   data).
 3. **A normative model**: fit your own, or transfer a pretrained one
    from
    `SURFdrive <https://surfdrive.surf.nl/s/Mb6mZyFmJeCaPcZ?dir=/zip>`__.
@@ -296,7 +296,8 @@ data as your normative model.
     axes[0].grid(False)
     fig.colorbar(image, ax=axes[0], label="correlation")
     
-    axes[1].plot(gaps, [corr.get(REGION, age, age + gap) for gap in gaps], marker="o")
+    # CorrelationMatrix.get_correlation() reads a correlation between two specific timepoints for one response variable.
+    axes[1].plot(gaps, [corr.get_correlation(REGION, age, age + gap) for gap in gaps], marker="o")
     axes[1].set_xlabel(f"Years after age {age}")
     axes[1].set_ylabel("correlation")
     axes[1].set_title(f"Correlation with the z-score at age {age}")
@@ -638,8 +639,8 @@ z-diff. z-diff though flags as extreme a few more patients than z-gain.
 
 Thrivelines borrow an idea from children’s growth charts. Each short
 blue line starts on a centile and runs one year forward. It shows the
-lowest a person starting there can go while still changing within the
-normal range:
+largest change (here: decline) a person starting there can have while
+still changing as expected:
 
 - **staying on or above a thriveline**: normal change,
 - **dropping below it**: unusually large decline (z-gain below −1.96).
@@ -647,8 +648,8 @@ normal range:
 Below we draw the patient with the most negative z-gain (red) and the
 control with the most typical change (blue).
 
-``VelocityModel.get_thrivelines()`` computes the thrivelines from the
-correlation matrix, and ``plot_thrivelines()`` draws them on the
+``VelocityModel.compute_thrivelines()`` computes the thrivelines from
+the correlation matrix, and ``plot_thrivelines()`` draws them on the
 normative model’s centile chart.
 
 .. code:: ipython3
@@ -658,11 +659,10 @@ normative model’s centile chart.
     youngest, oldest = int(lnm_ages.min()), int(lnm_ages.max()) + 1
     
     # Compute thrivelines
-    thrivelines = velocity.get_thrivelines(
-        centiles=CENTILES, # the centiles at which thrivelines start
+    thrivelines = velocity.compute_thrivelines(
+        centiles=CENTILES,  # thrivelines start on these centile curves
         covariate_range=(youngest, oldest),
-        z_thrive = -1.96 # -1.96: largest expected decline; +1.96: largest expected increase
-    
+        zgain_threshold=-1.96  # -1.96: largest expected decline; +1.96: largest expected increase
     )
     
     # Select 2 subjects

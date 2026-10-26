@@ -20,29 +20,18 @@ if TYPE_CHECKING:
 class ZDiffScore(LongitudinalScore):
     """Two-visit z-diff score (Rehák Bučková et al., 2025).
 
-    The z-diff score asks whether the change between two visits is larger or
-    smaller than expected under a fitted BLR normative model.
-
-        Δr_target = (y₂ - ŷ₂) - (y₁ - ŷ₁)
-
-    The toolkit scales that change by the spread of changes learned
-    from ``reference_data`` (can be the healthy subjects)::
-
-        z_diff = Δr_target / SD(Δr_reference)
-
-        where SD(Δr_reference) = sqrt(2σ²(1−ρ)) if the residuals are
-        stationary with variance σ² and visit-to-visit correlation ρ.
-
-    This score is intended for BLR-based models and subjects with at most two
-    visits.
+    Parameters
+    ----------
+    normative_model : NormativeModel
+        A fitted BLR normative model.
+    reference_data : NormData
+        People with two visits, usually healthy controls, used to learn how
+        much change is typical.
 
     Attributes
     ----------
     zdiff : xr.DataArray | None
-        The most recent z-diff scores produced by ``score``. ``None`` until
-        ``score`` has been called at least once. It stores the same
-        ``xr.DataArray`` that ``score`` returns, so the result can be
-        retrieved later even if the return value was not saved.
+        Last result of ``score``, or ``None`` before the first call.
     """
 
     def __init__(
@@ -69,29 +58,25 @@ class ZDiffScore(LongitudinalScore):
         score_data: NormData,
         save_path: str | PathLike[str] | None = None,
     ) -> xr.DataArray:
-        """Compute the z-diff score for every subject in ``score_data``.
+        """Compute one z-diff per subject and response variable.
 
         Parameters
         ----------
         score_data : NormData
-            Longitudinal cohort with exactly two visits per subject, numeric
-            visit labels on the NormData object, and predictions already
-            computed.
+            Subjects to score, with two visits each, predictions already
+            computed and visit numbers set.
         save_path : str | PathLike[str] | None, optional
-            If set, write scores to this CSV path, one row per subject and
-            one column per response variable. Opened as a table, it looks
-            like::
+            If set, also save the scores to this CSV file::
 
                 subjects  lh_thickness  rh_thickness
                 sub-01            0.42         -1.10
                 sub-02           -0.35          0.87
-                sub-03            2.13          1.95
 
         Returns
         -------
         xr.DataArray
-            One z-diff score per subject and response variable. The same array
-            is also stored on the instance as ``zdiff`` for later retrieval.
+            z-diff with dimensions ``(subjects, response_vars)``. Also stored
+            as ``self.zdiff``.
         """
         # Run checks first for both the reference and score data.
         # z-diff is built from residuals y - Yhat, so it needs Yhat, not Z.

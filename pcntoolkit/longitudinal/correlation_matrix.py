@@ -22,13 +22,11 @@ if TYPE_CHECKING:
 
 
 class CorrelationMatrix:
-    """Age-to-age z-score correlation matrix estimated from a longitudinal
-    cohort.
+    """How strongly a person's z-scores at two timepoints correlate.
 
-    The matrix records how strongly a subject's z-scores at two ages correlate.
 
     Do not call ``CorrelationMatrix(...)`` directly. Use ``compute`` to
-    estimate one from a cohort, or ``load`` to read one from CSV files.
+    estimate one from your data, or ``load`` to read saved CSV files.
 
     Examples
     --------
@@ -56,20 +54,19 @@ class CorrelationMatrix:
     Parameters
     ----------
     matrix : xr.DataArray
-        Correlation matrix, filled in by ``compute`` and ``load``.
+        The correlations, filled in by ``compute`` and ``load``.
     covariate : str, default "age"
         Covariate the matrix is indexed by.
     bandwidth : int, optional
-        Widest age gap with an estimated correlation. Correlations for wider
-        gaps are 0.
+        Widest age gap that has a correlation. Wider gaps are 0.
     max_correlation : float, default 0.99
-        Upper bound applied by ``get``, keeping the correlation away from 1
-        so that ``sqrt(1 - r**2)`` stays away from zero.
+        Cap on correlations read with ``get_correlation``, so the z-gain never
+        divides by zero (as it divides by sqrt(1 - r²))
     n_subjects : int, optional
-        Number of subjects in the cohort the matrix was estimated from.
+        Number of subjects the matrix was estimated from.
     estimated_range : tuple of int, optional
-        ``(min, max)`` covariate values actually observed in that cohort. Not
-        the same as the matrix coordinates, which always start at 0.
+        ``(min, max)`` ages actually seen in those subjects. Values outside it
+        are extrapolated. The matrix itself always starts at age 0.
 
     Attributes
     ----------
@@ -112,26 +109,29 @@ class CorrelationMatrix:
         covariate: str = "age",
         max_correlation: float = 0.99,
     ) -> CorrelationMatrix:
-        """Estimate a correlation matrix from a longitudinal cohort.
+        """Estimate the correlation matrix from your own longitudinal data.
+
+        .. warning::
+           This method is still under development and might change in the future.
 
         Parameters
         ----------
         data : NormData
-            Longitudinal cohort with predicted z-scores and repeated visits per
-            subject.
+            Subjects with two or more visits and z-scores already predicted.
         bandwidth : int, default 5
             Widest age gap, in years, to estimate correlations for.
             Correlations for wider gaps are set to 0.
         covariate : str, default "age"
-            Covariate to index the matrix by.
+            Covariate to compute correlations over.
         max_correlation : float, default 0.99
-            Upper bound applied by ``get``.
+            Cap on correlations read with ``get_correlation``, so the z-gain never
+            divides by zero (as it divides by sqrt(1 - r²))
 
         Returns
         -------
         CorrelationMatrix
-            The estimated matrix, carrying the cohort size and observed
-            covariate range.
+            The matrix, plus the number of subjects and the age range it was
+            estimated from.
 
         Raises
         ------
@@ -191,7 +191,8 @@ class CorrelationMatrix:
         covariate : str, default "age"
             Covariate the matrix is indexed by.
         max_correlation : float, default 0.99
-            Upper bound applied by ``get``.
+            Cap on correlations read with ``get_correlation``, so the z-gain never
+            divides by zero (as it divides by sqrt(1 - r²))
 
         Returns
         -------
@@ -227,8 +228,8 @@ class CorrelationMatrix:
             # round_trip parsing: the default parser is a hair imprecise, which
             # would make a loaded matrix score differently from the saved one.
             df = pd.read_csv(csv_path, index_col=0, float_precision="round_trip")
-            # get() reads cells by position, so covariate value c must sit in
-            # row c and column c.
+            # get_correlation() reads cells by position, so covariate value c
+            # must sit in row c and column c.
             expected = [str(c) for c in range(len(df))]
             if list(df.columns) != expected or list(df.index.astype(str)) != expected:
                 raise ValueError(
@@ -432,21 +433,27 @@ class CorrelationMatrix:
             # Keep full precision and use \n line endings on every OS.
             df.to_csv(directory / f"{response_var}.csv", lineterminator="\n")
 
-    def get(self, response_var: str, cov_1: int, cov_2: int) -> float:
-        """Read one correlation, clamped to the matrix and clipped for safety.
+    def get_correlation(
+        self, response_var: str, timepoint_1: int, timepoint_2: int
+    ) -> float:
+        """Read the correlation between two timepoints for one response variable.
+
+        For example, ``corr.get_correlation("lh_thickness", 40, 41)`` is how strongly a
+        z-score at age 40 predicts the z-score at age 41. Ages beyond the
+        matrix are moved to its nearest edge.
 
         Parameters
         ----------
         response_var : str
             Response variable to read.
-        cov_1, cov_2 : int
-            The two covariate values (e.g. ages) to correlate.
+        timepoint_1, timepoint_2 : int
+            The two timepoints to get the correlation for.
 
         Returns
         -------
         float
-            The correlation, clipped to ``+/- max_correlation`` so that
-            ``sqrt(1 - r**2)`` stays away from zero.
+            The correlation, kept between ``-max_correlation`` and
+            ``+max_correlation`` (default 0.99).
 
         Raises
         ------
@@ -464,13 +471,13 @@ class CorrelationMatrix:
             )
 
         max_cov = int(self.matrix[f"{self.covariate}_1"].max())
-        clamped = [int(np.clip(c, 0, max_cov)) for c in (cov_1, cov_2)]
+        clamped = [int(np.clip(t, 0, max_cov)) for t in (timepoint_1, timepoint_2)]
 
         # Warn when reading outside the range the cohort actually covered. No
         # subject was observed there, so the value is extrapolated.
         if self.estimated_range is not None:
             low, high = self.estimated_range
-            outside = [c for c in (cov_1, cov_2) if not low <= c <= high]
+            outside = [t for t in (timepoint_1, timepoint_2) if not low <= t <= high]
             if outside:
                 warnings.warn(
                     f"{self.covariate} {outside} falls outside the range "
