@@ -124,8 +124,8 @@ class CorrelationMatrix:
         covariate : str, default "age"
             Covariate to compute correlations over.
         max_correlation : float, default 0.99
-            Cap on correlations read with ``get_correlation``, so the z-gain
-            never divides by zero.
+            Cap on correlations read with ``get_correlation``, so the z-gain never
+            divides by zero (as it divides by sqrt(1 - r²))
 
         Returns
         -------
@@ -191,7 +191,8 @@ class CorrelationMatrix:
         covariate : str, default "age"
             Covariate the matrix is indexed by.
         max_correlation : float, default 0.99
-            Upper bound applied by ``get_correlation``.
+            Cap on correlations read with ``get_correlation``, so the z-gain never
+            divides by zero (as it divides by sqrt(1 - r²))
 
         Returns
         -------
@@ -435,7 +436,7 @@ class CorrelationMatrix:
     def get_correlation(
         self, response_var: str, timepoint_1: int, timepoint_2: int
     ) -> float:
-        """Read the correlation between two ages for one region.
+        """Read the correlation between two timepoints for one response variable.
 
         For example, ``corr.get_correlation("lh_thickness", 40, 41)`` is how strongly a
         z-score at age 40 predicts the z-score at age 41. Ages beyond the
@@ -444,9 +445,9 @@ class CorrelationMatrix:
         Parameters
         ----------
         response_var : str
-            Region (response variable) to read.
+            Response variable to read.
         timepoint_1, timepoint_2 : int
-            The two ages (or other covariate values).
+            The two timepoints to get the correlation for.
 
         Returns
         -------

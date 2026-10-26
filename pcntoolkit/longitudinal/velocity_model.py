@@ -35,7 +35,7 @@ class VelocityModel(LongitudinalScore):
     normative_model : NormativeModel
         A fitted normative model.
     correlation_matrix : CorrelationMatrix
-        How strongly z-scores at two ages correlate, from
+        How strongly z-scores at two timepoints correlate, from
         ``CorrelationMatrix.compute`` or ``CorrelationMatrix.load``.
 
     Attributes
@@ -81,28 +81,22 @@ class VelocityModel(LongitudinalScore):
         Someone who ends up beyond the line has changed more than expected.
         Draw the result with ``plot_thrivelines``.
 
-        Lines are computed for the first batch effect level in the model, and
-        any covariate other than age is held at the middle of its range.
+        By default, lines use the model's first batch effect level, and the rest of
+        the model's covariates are held at the middle of their range.
 
         Parameters
         ----------
         zgain_threshold : float, default -1.96
-            z-gain each line follows, which sets its slope. -1.96 (default):
-            lines slope down to the largest decline that is still expected.
-            +1.96: lines slope up to the largest rise that is still expected.
-            Called zα in Bayer et al. (2026).
+            z-gain each line follows, which sets its slope. It represents
+            largest expected change a subject can have in ``thriveline_span`` years.
         thriveline_span : int, default 1
-            How far each thriveline stretches along the x-axis, in years.
-            With 2, a thriveline starting at age 40 ends at 42.
+            How far each thriveline stretches along the x-axis.
         thriveline_spacing : int, default 1
-            Years between neighbouring thrivelines along the x-axis. With 2,
-            thrivelines start at ages 20, 22, 24, ...
+            How far apart neighbouring thrivelines are along the x-axis.
         centiles : array-like of float, optional
-            Centile curves the lines start on, between 0 and 1. For example
-            ``[0.05, 0.5, 0.95]`` starts lines on the 5th, 50th and 95th
-            centile curves. Defaults to ``[0.05, 0.25, 0.5, 0.75, 0.95]``,
-            the curves ``plot_thrivelines`` draws by default.
-        covariate_range : tuple of int, optional
+            Centile curves the lines start on, between 0 and 1.
+            Defaults to ``[0.05, 0.25, 0.5, 0.75, 0.95]``.
+            covariate_range : tuple of int, optional
             ``(min, max)`` ages to draw lines for, e.g. ``(20, 60)``. Defaults
             to every age in the correlation matrix.
         save_path : str | PathLike[str] | None, optional
@@ -111,7 +105,7 @@ class VelocityModel(LongitudinalScore):
         Returns
         -------
         pd.DataFrame
-            One row per line end point (two rows per line)::
+            Example:
 
                 segment  start_age  start_z  response_var  offset   X       Z     Y
                 0        20         0.0      lh_thickness  0       20   0.000  2.71
@@ -154,7 +148,7 @@ class VelocityModel(LongitudinalScore):
         score_data: NormData,
         save_path: str | PathLike[str] | None = None,
     ) -> xr.DataArray:
-        """Compute one z-gain per subject and brain region.
+        """Compute one z-gain per subject and response variable.
 
         Near 0: the person changed as expected. Below -1.96: an unusually
         large decline. Above +1.96: an unusually large rise.
@@ -230,7 +224,9 @@ class VelocityModel(LongitudinalScore):
                 r = self.correlation_matrix.get_correlation(rv, age_prev, age_last)
                 denominator = np.sqrt(1.0 - r**2)
                 # Compute zgain
-                scores[subject_index[subject], j] = (z_rv[obs_last] - r * z_rv[obs_prev]) / denominator
+                scores[subject_index[subject], j] = (
+                    z_rv[obs_last] - r * z_rv[obs_prev]
+                ) / denominator
 
         # Store the result so it can be retrieved later via self.zgain, even
         # if the caller does not keep the returned value.
