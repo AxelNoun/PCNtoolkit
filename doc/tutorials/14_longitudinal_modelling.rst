@@ -296,7 +296,7 @@ data as your normative model.
     axes[0].grid(False)
     fig.colorbar(image, ax=axes[0], label="correlation")
     
-    # CorrelationMatrix.get_correlation() reads a correlation between two specific ages for one response variable.
+    # CorrelationMatrix.get_correlation() reads a correlation between two specific timepoints for one response variable.
     axes[1].plot(gaps, [corr.get_correlation(REGION, age, age + gap) for gap in gaps], marker="o")
     axes[1].set_xlabel(f"Years after age {age}")
     axes[1].set_ylabel("correlation")
