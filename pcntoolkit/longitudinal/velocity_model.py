@@ -96,7 +96,7 @@ class VelocityModel(LongitudinalScore):
         centiles : array-like of float, optional
             Centile curves the lines start on, between 0 and 1.
             Defaults to ``[0.05, 0.25, 0.5, 0.75, 0.95]``.
-            covariate_range : tuple of int, optional
+        covariate_range : tuple of int, optional
             ``(min, max)`` ages to draw lines for, e.g. ``(20, 60)``. Defaults
             to every age in the correlation matrix.
         save_path : str | PathLike[str] | None, optional
