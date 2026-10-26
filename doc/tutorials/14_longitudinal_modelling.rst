@@ -20,8 +20,8 @@ What you need
    dataset (``LNM_data.csv``), loaded with ``load_lnm()``.
 2. **A correlation matrix** (used for velocity models): load a
    precomputed one (recommended, used here) or estimate one from your
-   own longitudinal data (we have a separate tutorial for that; needs
-   thousands of subjects with longitudinal data).
+   own longitudinal data (needs thousands of subjects with longitudinal
+   data).
 3. **A normative model**: fit your own, or transfer a pretrained one
    from
    `SURFdrive <https://surfdrive.surf.nl/s/Mb6mZyFmJeCaPcZ?dir=/zip>`__.
@@ -649,8 +649,7 @@ control with the most typical change (blue).
 
 ``VelocityModel.get_thrivelines()`` computes the thrivelines from the
 correlation matrix, and ``plot_thrivelines()`` draws them on the
-normative model’s centile chart. With ``zgain_threshold=+1.96`` the
-lines slope up instead and mark the largest rise that is still expected.
+normative model’s centile chart.
 
 .. code:: ipython3
 
@@ -662,7 +661,7 @@ lines slope up instead and mark the largest rise that is still expected.
     thrivelines = velocity.get_thrivelines(
         centiles=CENTILES,  # thrivelines start on these centile curves
         covariate_range=(youngest, oldest),
-        zgain_threshold=-1.96,  # -1.96: largest expected decline; +1.96: largest expected rise
+        zgain_threshold=-1.96  # -1.96: largest expected decline; +1.96: largest expected increase
     )
     
     # Select 2 subjects
