@@ -338,7 +338,7 @@ visits per subject.
 
    Fig. 1: z-diff score
 
-Kudos to Barbora Rehák Bučková for making this fugure (`Rehák Bučková et
+Kudos to Barbora Rehák Bučková for making this figure (`Rehák Bučková et
 al., 2025 <https://doi.org/10.7554/eLife.95823>`__).
 
 z-gain
@@ -661,6 +661,8 @@ normative model’s centile chart.
     thrivelines = velocity.get_thrivelines(
         centiles=CENTILES, # the centiles at which thrivelines start
         covariate_range=(youngest, oldest),
+        z_thrive = -1.96 # -1.96: largest expected decline; +1.96: largest expected increase
+    
     )
     
     # Select 2 subjects

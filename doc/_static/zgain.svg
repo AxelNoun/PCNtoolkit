@@ -15,7 +15,8 @@
 <line x1="13" y1="2569.5" x2="3111" y2="2569.5" stroke="#676767" stroke-width="8" stroke-dasharray="75 76.5"/>
 <text x="325.0" y="2172.0" font-size="51" font-weight="400" text-anchor="middle" fill="#000" font-style="italic">- one model per ROI</text>
 <text x="325.0" y="2236.0" font-size="51" font-weight="400" text-anchor="middle" fill="#000" font-style="italic">- any model type (BLR or HBR)</text>
-<text x="325.0" y="2300.0" font-size="51" font-weight="400" text-anchor="middle" fill="#000" font-style="italic">- each visit scored separately</text>
+<text x="325.0" y="2300.0" font-size="51" font-weight="400" text-anchor="middle" fill="#000" font-style="italic">- any number of visits</text>
+<text x="325.0" y="2364.0" font-size="51" font-weight="400" text-anchor="middle" fill="#000" font-style="italic">(here: 2 visits)</text>
 <text x="334.0" y="2850.0" font-size="73" font-weight="700" text-anchor="middle" fill="#000">load a</text>
 <text x="334.0" y="2944.0" font-size="73" font-weight="700" text-anchor="middle" fill="#000">precomputed</text>
 <text x="334.0" y="3038.0" font-size="73" font-weight="700" text-anchor="middle" fill="#000">correlation</text>
@@ -325,20 +326,18 @@
 <rect x="2252" y="2630" width="28" height="28" fill="#d81359"/>
 </g>
 <rect x="1720" y="2630" width="560" height="560" fill="none" stroke="#9a9a9a" stroke-width="3"/>
-<line x1="2098.0" y1="2804.0" x2="2098.0" y2="3190" stroke="#0c4e5a" stroke-width="4" stroke-dasharray="10 8"/>
-<line x1="2078.0" y1="2784.0" x2="1720" y2="2784.0" stroke="#0c4e5a" stroke-width="4" stroke-dasharray="10 8"/>
-<line x1="2098.0" y1="3190" x2="2098.0" y2="3206" stroke="#0c4e5a" stroke-width="6"/>
-<line x1="1704" y1="2784.0" x2="1720" y2="2784.0" stroke="#0c4e5a" stroke-width="6"/>
-<text x="2098.0" y="3254.0" font-size="46" font-weight="700" text-anchor="middle" fill="#0c4e5a">visit 1</text>
-<text x="1694.0" y="2800.0" font-size="46" font-weight="700" text-anchor="end" fill="#0c4e5a">visit 2</text>
-<text x="2280.0" y="3254.0" font-size="46" font-weight="700" text-anchor="end" fill="#555555">age</text>
-<text x="1694.0" y="2670.0" font-size="46" font-weight="700" text-anchor="end" fill="#555555">age</text>
-<rect x="2079.0" y="2765.0" width="38" height="38" fill="none" stroke="#000" stroke-width="6"/>
-<line x1="2117.0" y1="2784.0" x2="2365" y2="2784.0" stroke="#ffffff" stroke-width="10"/>
-<line x1="2117.0" y1="2784.0" x2="2365" y2="2784.0" stroke="#000" stroke-width="3.5"/>
+<line x1="2126.0" y1="2832.0" x2="2126.0" y2="3190" stroke="#0c4e5a" stroke-width="4" stroke-dasharray="10 8"/>
+<line x1="2106.0" y1="2812.0" x2="1720" y2="2812.0" stroke="#0c4e5a" stroke-width="4" stroke-dasharray="10 8"/>
+<line x1="2126.0" y1="3190" x2="2126.0" y2="3206" stroke="#0c4e5a" stroke-width="6"/>
+<line x1="1704" y1="2812.0" x2="1720" y2="2812.0" stroke="#0c4e5a" stroke-width="6"/>
+<text x="2126.0" y="3254.0" font-size="46" font-weight="700" text-anchor="middle" fill="#0c4e5a">visit 2</text>
+<text x="1694.0" y="2828.0" font-size="46" font-weight="700" text-anchor="end" fill="#0c4e5a">visit 1</text>
+<rect x="2107.0" y="2793.0" width="38" height="38" fill="none" stroke="#000" stroke-width="6"/>
+<line x1="2145.0" y1="2812.0" x2="2365" y2="2812.0" stroke="#ffffff" stroke-width="10"/>
+<line x1="2145.0" y1="2812.0" x2="2365" y2="2812.0" stroke="#000" stroke-width="3.5"/>
 <text x="2385.0" y="2734.0" font-size="51" font-weight="400" text-anchor="start" fill="#000" font-style="italic">how strongly a z-score</text>
-<text x="2385.0" y="2798.0" font-size="51" font-weight="400" text-anchor="start" fill="#000" font-style="italic">at one age predicts the</text>
-<text x="2385.0" y="2862.0" font-size="51" font-weight="400" text-anchor="start" fill="#000" font-style="italic">z-score a year later</text>
+<text x="2385.0" y="2798.0" font-size="51" font-weight="400" text-anchor="start" fill="#000" font-style="italic">at timepoint 1 predicts</text>
+<text x="2385.0" y="2862.0" font-size="51" font-weight="400" text-anchor="start" fill="#000" font-style="italic">the z-score at timepoint 2</text>
 <line x1="13" y1="3340.5" x2="3111" y2="3340.5" stroke="#676767" stroke-width="8" stroke-dasharray="75 76.5"/>
 <text x="334.0" y="3829.0" font-size="73" font-weight="700" text-anchor="middle" fill="#000">estimate</text>
 <text x="334.0" y="3923.0" font-size="73" font-weight="700" text-anchor="middle" fill="#000"><tspan font-style="italic">z-gain</tspan> score</text>
@@ -363,12 +362,8 @@
 <circle cx="1920.0" cy="4020.1" r="20" fill="#0c4e5a"/>
 <line x1="1500" y1="3763.8" x2="1500" y2="4220.9" stroke="#9a9a9a" stroke-width="3" stroke-dasharray="8 8"/>
 <line x1="1920" y1="4048.1" x2="1920" y2="4220.9" stroke="#9a9a9a" stroke-width="3" stroke-dasharray="8 8"/>
-<line x1="1532.0" y1="4250.9" x2="1888.0" y2="4250.9" stroke="#000" stroke-width="12"/>
-<polygon points="1920.0,4250.9 1880.0,4270.9 1887.2,4250.9 1880.0,4230.9" fill="#000"/>
-<polygon points="1500.0,4250.9 1540.0,4270.9 1532.8,4250.9 1540.0,4230.9" fill="#000"/>
 <text x="1470.0" y="4266.9" font-size="46" font-weight="700" text-anchor="end" fill="#0c4e5a">visit 1</text>
 <text x="1950.0" y="4266.9" font-size="46" font-weight="700" text-anchor="start" fill="#0c4e5a">visit 2</text>
-<text x="1710.0" y="4330.9" font-size="52" font-weight="700" text-anchor="middle" fill="#000">1 year</text>
 <line x1="1948.0" y1="3802.5" x2="2220.0" y2="3802.5" stroke="#555555" stroke-width="3"/>
 <text x="2240.0" y="3792.5" font-size="52" font-weight="700" text-anchor="start" fill="#000">expected change</text>
 <line x1="2242.0" y1="3841.5" x2="2280.4" y2="3841.5" stroke="#000" stroke-width="7"/>
@@ -382,8 +377,8 @@
 <text x="2240.0" y="3518.9" font-size="46" font-weight="700" text-anchor="start" fill="#d81359">expected zone</text>
 <text x="2240.0" y="3572.9" font-size="46" font-weight="700" text-anchor="start" fill="#d81359">for visit 2</text>
 <line x1="1928.0" y1="3728.7" x2="2220.0" y2="3556.9" stroke="#555555" stroke-width="3"/>
-<line x1="2098.0" y1="2803.0" x2="1710.0" y2="3744.1" stroke="#ffffff" stroke-width="11"/>
-<line x1="2098.0" y1="2803.0" x2="1710.0" y2="3744.1" stroke="#d81359" stroke-width="4"/>
+<line x1="2126.0" y1="2831.0" x2="1710.0" y2="3744.1" stroke="#ffffff" stroke-width="11"/>
+<line x1="2126.0" y1="2831.0" x2="1710.0" y2="3744.1" stroke="#d81359" stroke-width="4"/>
 <circle cx="1710.0" cy="3744.1" r="7" fill="#d81359"/>
 <line x1="13" y1="4380.5" x2="3111" y2="4380.5" stroke="#676767" stroke-width="8" stroke-dasharray="75 76.5"/>
 <text x="334.0" y="4879.0" font-size="73" font-weight="700" text-anchor="middle" fill="#000">plot</text>
@@ -430,8 +425,9 @@
 <line x1="2048.0" y1="5220.4" x2="2220.0" y2="5220.4" stroke="#555555" stroke-width="3"/>
 <line x1="2240" y1="4610" x2="2350" y2="4650" stroke="#d81359" stroke-width="8" stroke-linecap="round"/>
 <text x="2380.0" y="4640.0" font-size="52" font-weight="700" text-anchor="start" fill="#d81359">thriveline:</text>
-<text x="2240.0" y="4710.0" font-size="48" font-weight="400" text-anchor="start" fill="#000" font-style="italic">the lowest a person can go</text>
-<text x="2240.0" y="4770.0" font-size="48" font-weight="400" text-anchor="start" fill="#000" font-style="italic">in one year and still be</text>
-<text x="2240.0" y="4830.0" font-size="48" font-weight="400" text-anchor="start" fill="#000" font-style="italic">changing normally</text>
+<text x="2240.0" y="4710.0" font-size="48" font-weight="400" text-anchor="start" fill="#000" font-style="italic">the largest change (here: decline)</text>
+<text x="2240.0" y="4770.0" font-size="48" font-weight="400" text-anchor="start" fill="#000" font-style="italic">that is still expected</text>
+<text x="2240.0" y="4850.0" font-size="48" font-weight="400" text-anchor="start" fill="#555555" font-style="italic">we can also plot upward</text>
+<text x="2240.0" y="4910.0" font-size="48" font-weight="400" text-anchor="start" fill="#555555" font-style="italic">thrivelines to mark increases</text>
 <line x1="13" y1="5370.5" x2="3111" y2="5370.5" stroke="#676767" stroke-width="8" stroke-dasharray="75 76.5"/>
 </svg>
