@@ -111,6 +111,9 @@ class CorrelationMatrix:
     ) -> CorrelationMatrix:
         """Estimate the correlation matrix from your own longitudinal data.
 
+        .. warning::
+           This method is still under development and might change in the future.
+
         For every pair of ages, this correlates the z-scores of people
         scanned at both ages. Usually these are healthy controls.
 
