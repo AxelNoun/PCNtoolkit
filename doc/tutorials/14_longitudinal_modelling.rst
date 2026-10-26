@@ -638,8 +638,8 @@ z-diff. z-diff though flags as extreme a few more patients than z-gain.
 
 Thrivelines borrow an idea from children’s growth charts. Each short
 blue line starts on a centile and runs one year forward. It shows the
-lowest a person starting there can go while still changing within the
-normal range:
+largest change (here: decline) a person starting there can have while
+still changing as expected:
 
 - **staying on or above a thriveline**: normal change,
 - **dropping below it**: unusually large decline (z-gain below −1.96).
@@ -649,7 +649,8 @@ control with the most typical change (blue).
 
 ``VelocityModel.get_thrivelines()`` computes the thrivelines from the
 correlation matrix, and ``plot_thrivelines()`` draws them on the
-normative model’s centile chart.
+normative model’s centile chart. With ``zgain_threshold=+1.96`` the
+lines slope up instead and mark the largest rise that is still expected.
 
 .. code:: ipython3
 
@@ -659,10 +660,9 @@ normative model’s centile chart.
     
     # Compute thrivelines
     thrivelines = velocity.get_thrivelines(
-        centiles=CENTILES, # the centiles at which thrivelines start
+        centiles=CENTILES,  # thrivelines start on these centile curves
         covariate_range=(youngest, oldest),
-        z_thrive = -1.96 # -1.96: largest expected decline; +1.96: largest expected increase
-    
+        zgain_threshold=-1.96,  # -1.96: largest expected decline; +1.96: largest expected rise
     )
     
     # Select 2 subjects

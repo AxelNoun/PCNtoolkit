@@ -53,9 +53,9 @@ def test_propagate_thriveline_z_requires_hop_dimension():
 
 def test_propagate_thriveline_z_bayer_update():
     hop = xr.DataArray(
-        [0.8], dims=("hop",), coords={"hop": [0]}, attrs={"timepoint_diff": 2}
+        [0.8], dims=("hop",), coords={"hop": [0]}, attrs={"thriveline_span": 2}
     )
-    z_path = propagate_thriveline_z(hop, start_z=1.0, z_thrive=-1.96)
+    z_path = propagate_thriveline_z(hop, start_z=1.0, zgain_threshold=-1.96)
 
     expected_next = 1.0 * 0.8 + math.sqrt(1.0 - 0.8**2) * (-1.96)
     assert z_path.dims == ("offset",)
@@ -64,18 +64,18 @@ def test_propagate_thriveline_z_bayer_update():
     assert z_path.values[1] == pytest.approx(expected_next)
 
 
-def test_compute_thrivelines_rejects_non_positive_timepoint_diff():
+def test_compute_thrivelines_rejects_non_positive_thriveline_span():
     R = _make_correlation_matrix()
-    with pytest.raises(ValueError, match="timepoint_diff"):
-        compute_thrivelines(R, timepoint_diff=0)
+    with pytest.raises(ValueError, match="thriveline_span"):
+        compute_thrivelines(R, thriveline_span=0)
 
 
 def test_compute_thrivelines_output_structure():
     R = _make_correlation_matrix(max_age=3, response_vars=["metric_a", "metric_b"])
     thrive_Z, thrive_X = compute_thrivelines(
         R,
-        timepoint_diff=1,
-        anchor_step=1,
+        thriveline_span=1,
+        thriveline_spacing=1,
         centiles=[0.5],
     )
 
@@ -91,8 +91,8 @@ def test_compute_thrivelines_propagates_with_known_correlation():
     R = _make_correlation_matrix(max_age=2, offset_correlations={1: 0.8})
     thrive_Z, thrive_X = compute_thrivelines(
         R,
-        timepoint_diff=1,
-        anchor_step=1,
+        thriveline_span=1,
+        thriveline_spacing=1,
         centiles=[norm.cdf(1.0)],
         covariate_range=(0, 1),
     )
@@ -130,7 +130,7 @@ def test_compute_thrivelines_zero_correlation_warns_and_omits_segments():
         warnings.simplefilter("always")
         thrive_Z, _ = compute_thrivelines(
             R,
-            timepoint_diff=1,
+            thriveline_span=1,
             centiles=[0.5],
             covariate_range=(0, 2),
         )
@@ -210,4 +210,4 @@ def test_thrivelines_to_dataframe_long_format():
     assert len(df) == thrive_Z.sizes["segment"] * thrive_Z.sizes["offset"]
     assert set(df["response_var"]) == {"metric_a"}
     assert set(df["offset"]) == {0, 1}
-    assert df.attrs.get("timepoint_diff") == 1
+    assert df.attrs.get("thriveline_span") == 1

@@ -28,9 +28,9 @@ def test_propagate_thriveline_z_multi_hop():
         [0.7, 0.6],
         dims=("hop",),
         coords={"hop": [0, 1]},
-        attrs={"timepoint_diff": 1},
+        attrs={"thriveline_span": 1},
     )
-    z_path = propagate_thriveline_z(hop, start_z=0.5, z_thrive=-1.96)
+    z_path = propagate_thriveline_z(hop, start_z=0.5, zgain_threshold=-1.96)
 
     assert list(z_path.coords["offset"].values) == [0, 1, 2]
     assert z_path.isel(offset=0).item() == pytest.approx(0.5)
@@ -48,27 +48,27 @@ def test_compute_thrivelines_negative_correlation(correlation_matrix_array_facto
     assert seg.isel(offset=1).item() < seg.isel(offset=0).item()
 
 
-def test_compute_thrivelines_respects_anchor_step(correlation_matrix_array_factory):
+def test_compute_thrivelines_respects_spacing(correlation_matrix_array_factory):
     matrix = correlation_matrix_array_factory(max_age=4, offset_correlations={1: 0.8})
     thrive_Z, _ = compute_thrivelines(
         matrix,
-        anchor_step=2,
+        thriveline_spacing=2,
         centiles=[0.5],
         covariate_range=(0, 4),
     )
     assert set(thrive_Z.coords["start_age"].values) <= {0, 2, 4}
 
 
-def test_compute_thrivelines_timepoint_diff_two(correlation_matrix_array_factory):
+def test_compute_thrivelines_span_of_two(correlation_matrix_array_factory):
     matrix = correlation_matrix_array_factory(max_age=4, offset_correlations={2: 0.7})
     thrive_Z, thrive_X = compute_thrivelines(
         matrix,
-        timepoint_diff=2,
+        thriveline_span=2,
         centiles=[0.84],
         covariate_range=(0, 2),
     )
     assert list(thrive_X.coords["offset"].values) == [0, 2]
-    assert thrive_Z.attrs.get("timepoint_diff") == 2
+    assert thrive_Z.attrs.get("thriveline_span") == 2
 
 
 def test_thrivelines_to_dataframe_multiple_response_vars(
@@ -117,9 +117,9 @@ def test_propagate_thriveline_z_requires_hop_dimension():
 
 def test_propagate_thriveline_z_bayer_update():
     hop = xr.DataArray(
-        [0.8], dims=("hop",), coords={"hop": [0]}, attrs={"timepoint_diff": 2}
+        [0.8], dims=("hop",), coords={"hop": [0]}, attrs={"thriveline_span": 2}
     )
-    z_path = propagate_thriveline_z(hop, start_z=1.0, z_thrive=-1.96)
+    z_path = propagate_thriveline_z(hop, start_z=1.0, zgain_threshold=-1.96)
 
     expected_next = 1.0 * 0.8 + math.sqrt(1.0 - 0.8**2) * (-1.96)
     assert z_path.dims == ("offset",)
@@ -128,11 +128,11 @@ def test_propagate_thriveline_z_bayer_update():
     assert z_path.values[1] == pytest.approx(expected_next)
 
 
-def test_compute_thrivelines_rejects_non_positive_timepoint_diff(
+def test_compute_thrivelines_rejects_non_positive_thriveline_span(
     synthetic_correlation_matrix,
 ):
-    with pytest.raises(ValueError, match="timepoint_diff"):
-        compute_thrivelines(synthetic_correlation_matrix, timepoint_diff=0)
+    with pytest.raises(ValueError, match="thriveline_span"):
+        compute_thrivelines(synthetic_correlation_matrix, thriveline_span=0)
 
 
 def test_compute_thrivelines_output_structure(correlation_matrix_array_factory):
@@ -142,8 +142,8 @@ def test_compute_thrivelines_output_structure(correlation_matrix_array_factory):
     )
     thrive_Z, thrive_X = compute_thrivelines(
         matrix,
-        timepoint_diff=1,
-        anchor_step=1,
+        thriveline_span=1,
+        thriveline_spacing=1,
         centiles=[0.5],
     )
 
@@ -161,8 +161,8 @@ def test_compute_thrivelines_propagates_with_known_correlation(
     matrix = correlation_matrix_array_factory(max_age=2, offset_correlations={1: 0.8})
     thrive_Z, thrive_X = compute_thrivelines(
         matrix,
-        timepoint_diff=1,
-        anchor_step=1,
+        thriveline_span=1,
+        thriveline_spacing=1,
         centiles=[norm.cdf(1.0)],
         covariate_range=(0, 1),
     )
@@ -223,7 +223,7 @@ def test_compute_thrivelines_zero_correlation_warns_and_omits_segments(
         warnings.simplefilter("always")
         thrive_Z, _ = compute_thrivelines(
             matrix,
-            timepoint_diff=1,
+            thriveline_span=1,
             centiles=[0.5],
             covariate_range=(0, 2),
         )
@@ -295,7 +295,7 @@ def test_thrivelines_to_dataframe_long_format(correlation_matrix_array_factory):
     assert len(df) == thrive_Z.sizes["segment"] * thrive_Z.sizes["offset"]
     assert set(df["response_var"]) == {"metric_a"}
     assert set(df["offset"]) == {0, 1}
-    assert df.attrs.get("timepoint_diff") == 1
+    assert df.attrs.get("thriveline_span") == 1
 
 
 def test_zgain_get_thrivelines_returns_dataframe(

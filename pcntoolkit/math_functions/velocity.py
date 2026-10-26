@@ -296,31 +296,32 @@ def design_matrix(bandwidth: int, Sigma: np.ndarray) -> pd.DataFrame:
 def propagate_thriveline_z(
     correlations: xr.DataArray,
     start_z: xr.DataArray | float,
-    z_thrive: float = -1.96,
+    zgain_threshold: float = -1.96,
 ) -> xr.DataArray:
-    """Propagate one thriveline segment in z-space using the Bayer et al. (2026) update.
+    """Compute where one thriveline ends, in z-scores (Bayer et al., 2026).
 
     Each step applies
 
-        Z_{next} = Z_{current} * r + sqrt(1 - r^2) * z_thrive
+        Z_next = r * Z_current + sqrt(1 - r²) * zgain_threshold
 
-    where ``r`` is the Pearson correlation between consecutive covariate
-    timepoints and ``z_thrive`` pulls the trajectory toward typical growth.
+    where ``r`` is the correlation between the two timepoints. This is the
+    z-gain formula solved for the later z-score, so the z-gain from the
+    start to the end of the line equals ``zgain_threshold``.
 
     Parameters
     ----------
     correlations : xr.DataArray
-        Pearson correlations for each step, earliest timepoint first.
-        Must have dimension ``hop``.
+        Correlation for each step, earliest timepoint first. Must have
+        dimension ``hop``.
     start_z : xr.DataArray or float
-        Z-score at the anchor timepoint.
-    z_thrive : float, default -1.96
-        Thrive shrinkage term added at each step.
+        Z-score where the line starts.
+    zgain_threshold : float, default -1.96
+        z-gain the line follows: -1.96 slopes down, +1.96 slopes up.
 
     Returns
     -------
     xr.DataArray
-        Z-scores along the segment, dimension ``offset``.
+        Z-scores along the line, dimension ``offset``.
     """
     # Require the hop dimension so correlations are ordered in time.
     if "hop" not in correlations.dims:
@@ -334,91 +335,83 @@ def propagate_thriveline_z(
     current = z0
     # Apply the thriveline update once per hop in chronological order.
     for r in correlations.transpose("hop").values:
-        # Mix persistence (r) with shrinkage toward z_thrive over one step.
-        current = current * float(r) + math.sqrt(1.0 - float(r) ** 2) * z_thrive
+        # Next z-score that gives a z-gain of exactly zgain_threshold.
+        current = current * float(r) + math.sqrt(1.0 - float(r) ** 2) * zgain_threshold
         # Append the propagated z-score to the segment path.
         z_path.append(current)
 
     # Read the covariate spacing between consecutive offsets, defaulting to 1.
-    timepoint_diff = correlations.attrs.get("timepoint_diff", 1)
+    thriveline_span = correlations.attrs.get("thriveline_span", 1)
     # Return the full z-path labelled by covariate offset from the anchor.
     return xr.DataArray(
         z_path,
         dims=("offset",),
-        coords={"offset": np.arange(len(z_path)) * timepoint_diff},
-        attrs={"z_thrive": z_thrive, "timepoint_diff": timepoint_diff},
+        coords={"offset": np.arange(len(z_path)) * thriveline_span},
+        attrs={"zgain_threshold": zgain_threshold, "thriveline_span": thriveline_span},
     )
 
 
 def compute_thrivelines(
     R: xr.DataArray,
     *,
-    timepoint_diff: int = 1,
-    z_thrive: float = -1.96,
+    zgain_threshold: float = -1.96,
+    thriveline_span: int = 1,
+    thriveline_spacing: int = 1,
+    centiles: list[float] | np.ndarray | None = None,
+    covariate_range: tuple[int, int] | None = None,
     propagate: Callable[
         [xr.DataArray, xr.DataArray | float, float], xr.DataArray
     ] = propagate_thriveline_z,
-    anchor_step: int = 1,
-    centiles: list[float] | np.ndarray | None = None,
-    covariate_range: tuple[int, int] | None = None,
 ) -> tuple[xr.DataArray, xr.DataArray]:
-    """Build a grid of thriveline segments from a longitudinal correlation matrix.
+    """Compute thrivelines, in z-scores, from a correlation matrix.
 
-    Thrivelines describe how a z-score is expected to change over a fixed
-    covariate step (for example, one year), given correlations between
-    covariate timepoints. For each label in ``R.response_vars``, the function
-    places anchor points on a regular grid of starting covariate values and
-    starting z-scores, looks up the correlation between consecutive timepoints
-    separated by ``timepoint_diff``, and propagates each anchor forward via
-    ``propagate``.
+    Each thriveline is a short line segment. It starts on a centile curve and
+    ends where a person would land after ``thriveline_span`` years with a
+    z-gain of exactly ``zgain_threshold``.
 
     Parameters
     ----------
     R : xr.DataArray
-        Longitudinal correlation matrix between pairs of covariate timepoints,
-        with shape ``(response_vars, covariate_1, covariate_2)``. The two
-        covariate axes index integer timepoint values (e.g. age in years); each
-        entry is the Pearson correlation of z-scores between those timepoints.
-        To obtain valid thrivelines, the correlations at ``timepoint_diff``
-        must be greater than zero; missing or zero entries usually indicate
-        uncomputed offsets and those segments are omitted with a warning.
-    timepoint_diff : int, default 1
-        Covariate step between the two timepoints on each segment (e.g. 1 year).
-    z_thrive : float, default -1.96
-        Shrinkage term passed through to ``propagate``.
-    propagate : callable, default ``propagate_thriveline_z``
-        Function that propagates z-scores along one segment:
-        ``propagate(hop_correlations, start_z, z_thrive) -> xr.DataArray``.
-        The default implements the update of Bayer et al. (2026); alternative
-        propagators may be supplied to extend the toolbox.
-    anchor_step : int, default 1
-        Spacing between starting covariate anchors on the overlay grid.
+        Correlation matrix with dimensions
+        ``(response_vars, <covariate>_1, <covariate>_2)``. Ages with a zero or
+        missing correlation get no thriveline, and a warning is raised.
+    zgain_threshold : float, default -1.96
+        z-gain each line follows. -1.96: the line slopes down to the largest
+        decline that is still expected. +1.96: it slopes up to the largest
+        rise that is still expected. Called zα in Bayer et al. (2026).
+    thriveline_span : int, default 1
+        How far each thriveline stretches along the x-axis, in years. With
+        2, a thriveline starting at age 40 ends at 42.
+    thriveline_spacing : int, default 1
+        Years between neighbouring thrivelines along the x-axis. With 2,
+        thrivelines start at ages 20, 22, 24, ...
     centiles : array-like of float, optional
-        Centiles (between 0 and 1) where thrivelines start. Defaults to
-        ``[0.05, 0.25, 0.5, 0.75, 0.95]``, the same centiles that
-        ``plot_thrivelines`` draws by default, so
-        every thriveline starts on a plotted centile curve.
+        Centile curves the lines start on, between 0 and 1. Defaults to
+        ``[0.05, 0.25, 0.5, 0.75, 0.95]``, the curves ``plot_thrivelines``
+        draws by default.
     covariate_range : tuple of int, optional
-        ``(min, max)`` covariate bounds used to slice ``R`` and place grid
-        anchors. When omitted, anchors span the covariate coordinates in ``R``.
+        ``(min, max)`` ages to draw lines for. Defaults to every age in ``R``.
+    propagate : callable, default ``propagate_thriveline_z``
+        Function that computes where a line ends:
+        ``propagate(hop_correlations, start_z, zgain_threshold)``. Only change
+        it to try a different formula.
 
     Returns
     -------
     thrive_Z, thrive_X : xr.DataArray
-        Propagated z-scores and covariate coordinates, both with dimensions
-        ``(segment, response_vars, offset)``. Each segment is one anchor pair
-        propagated over ``timepoint_diff``; segments with missing or zero
-        correlations are left as NaN and trigger a ``UserWarning``.
+        Z-scores and ages of each line's start and end point, with dimensions
+        ``(segment, response_vars, offset)``. Lines that could not be computed
+        are NaN.
 
     Raises
     ------
     ValueError
-        If ``timepoint_diff`` is not positive, or if a centile is not strictly
-        between 0 and 1.
+        If ``thriveline_span`` is not positive, or if a centile is not
+        strictly between 0 and 1.
     """
     # Reject non-positive covariate steps because propagation needs a forward hop.
-    if timepoint_diff <= 0:
-        raise ValueError("timepoint_diff must be > 0.")
+    if thriveline_span <= 0:
+        raise ValueError("thriveline_span must be > 0.")
 
     if centiles is None:
         centiles = DEFAULT_THRIVELINE_CENTILES
@@ -426,7 +419,8 @@ def compute_thrivelines(
     # The 0th and 100th centiles map to infinite z-scores.
     if np.any((centiles <= 0) | (centiles >= 1)):
         raise ValueError(
-            f"centiles must be strictly between 0 and 1, got {centiles.tolist()}."
+            "centiles must be strictly between 0 and 1, "
+            f"got {centiles.tolist()}."
         )
 
     # Ensure R carries a response_vars dimension and collect its labels.
@@ -444,25 +438,25 @@ def compute_thrivelines(
         R.isel(response_vars=0, drop=True)
     )
     # Extend the grid upper bound so the last anchor can still take one forward step.
-    end_covariate = max_covariate + timepoint_diff
+    end_covariate = max_covariate + thriveline_span
 
     # Build the Cartesian grid of (covariate anchor, starting z-score) pairs.
     start_ages, start_z = _grid_anchors(
         min_covariate,
         end_covariate,
-        anchor_step,
+        thriveline_spacing,
         norm.ppf(centiles),
     )
 
     # Drop anchors whose forward step would fall outside the correlation matrix.
     start_ages, start_z = _drop_out_of_range_anchors(
-        start_ages, start_z, min_covariate, max_covariate, timepoint_diff
+        start_ages, start_z, min_covariate, max_covariate, thriveline_span
     )
 
     # Count how many thriveline segments remain after filtering.
     n_segments = start_ages.sizes["segment"]
     # Each segment has exactly two offsets: the anchor and one step forward.
-    offsets = xr.DataArray([0, timepoint_diff], dims="offset")
+    offsets = xr.DataArray([0, thriveline_span], dims="offset")
     # Preallocate z-score output; NaN marks segments with missing correlations.
     thrive_Z = xr.DataArray(
         np.full((n_segments, len(response_vars), 2), np.nan),
@@ -474,7 +468,7 @@ def compute_thrivelines(
         },
         attrs={
             "propagate": getattr(propagate, "__name__", str(propagate)),
-            "timepoint_diff": timepoint_diff,
+            "thriveline_span": thriveline_span,
         },
     )
     # Preallocate covariate output on the same grid as thrive_Z.
@@ -497,7 +491,7 @@ def compute_thrivelines(
             # Read the covariate value where this segment starts.
             covariate_anchor = start_ages.isel(segment=seg_idx).item()
             # The forward timepoint is one fixed covariate step later.
-            covariate_to = covariate_anchor + timepoint_diff
+            covariate_to = covariate_anchor + thriveline_span
             # Read the starting z-score for this segment (shared across regions).
             z_anchor = start_z.isel(segment=seg_idx)
             # Look up the Pearson r between anchor and forward covariate values.
@@ -513,10 +507,10 @@ def compute_thrivelines(
                 [r],
                 dims=("hop",),
                 coords={"hop": [0]},
-                attrs={"timepoint_diff": timepoint_diff},
+                attrs={"thriveline_span": thriveline_span},
             )
             # Propagate the anchor z-score forward by one covariate step.
-            z_path = propagate(hop_rs, z_anchor, z_thrive)
+            z_path = propagate(hop_rs, z_anchor, zgain_threshold)
             # Require propagate to return offset-labelled z-scores.
             if "offset" not in z_path.dims:
                 raise ValueError(
@@ -533,7 +527,7 @@ def compute_thrivelines(
     if uncomputed_correlations:
         warnings.warn(
             "Thriveline computation cannot be completed for all requested "
-            f"segments: one or more age pairs at timepoint_diff={timepoint_diff} "
+            f"segments: one or more age pairs at thriveline_span={thriveline_span} "
             "have zero or missing correlations in the correlation matrix. This "
             "typically indicates that those age offsets were not estimated "
             "and the thriveline cannot be computed. Affected segments have been omitted.",
@@ -684,7 +678,7 @@ def compute_thriveline_y(
 
 
 # Public long-form schema: one row per point on a thriveline segment.
-# A segment is one (start_age, start_z) anchor propagated over timepoint_diff.
+# A segment is one (start_age, start_z) anchor propagated over thriveline_span.
 THRIVELINE_DF_COLUMNS = (
     "segment",
     "start_age",
@@ -753,7 +747,7 @@ def thrivelines_to_dataframe(
             segment = int(z_rv.coords["segment"].values[seg_idx])
             start_age = float(start_ages[seg_idx]) if start_ages is not None else np.nan
             start_z = float(start_zs[seg_idx]) if start_zs is not None else np.nan
-            # Each segment has two points: offset 0 (anchor) and offset timepoint_diff.
+            # Each segment has two points: offset 0 (anchor) and offset thriveline_span.
             for off_idx, offset in enumerate(offsets):
                 rows.append(
                     {
@@ -770,7 +764,7 @@ def thrivelines_to_dataframe(
 
     df = pd.DataFrame(rows, columns=list(THRIVELINE_DF_COLUMNS))
     # Preserve propagation metadata for downstream inspection.
-    for key in ("timepoint_diff", "propagate"):
+    for key in ("thriveline_span", "propagate"):
         if key in thrive_Z.attrs:
             df.attrs[key] = thrive_Z.attrs[key]
     return df
@@ -912,12 +906,12 @@ def _lookup_correlation(
 def _grid_anchors(
     start_covariate: int,
     end_covariate: int,
-    anchor_step: int,
+    thriveline_spacing: int,
     z_values: np.ndarray,
 ) -> tuple[xr.DataArray, xr.DataArray]:
     """Build a Cartesian grid of covariate and z-score anchor points."""
     # Place covariate anchors from start up to (but not including) end_covariate.
-    covariate_anchors = np.arange(start_covariate, end_covariate, anchor_step)
+    covariate_anchors = np.arange(start_covariate, end_covariate, thriveline_spacing)
     # Form every (covariate, z-score) pair on the overlay grid.
     age_grid, z_grid = np.meshgrid(covariate_anchors, z_values, indexing="ij")
     # Assign a flat segment index to each grid cell.
@@ -968,12 +962,12 @@ def _drop_out_of_range_anchors(
     start_z: xr.DataArray,
     min_covariate: int,
     max_covariate: int,
-    timepoint_diff: int,
+    thriveline_span: int,
 ) -> tuple[xr.DataArray, xr.DataArray]:
     """Keep only anchors whose forward step stays inside the correlation matrix."""
     # A segment is valid when the anchor lies in range and the forward step fits.
     valid = (start_ages.values >= min_covariate) & (
-        start_ages.values + timepoint_diff <= max_covariate
+        start_ages.values + thriveline_span <= max_covariate
     )
     # Return filtered covariate and z anchors with matching segment indices.
     return start_ages.isel(segment=valid), start_z.isel(segment=valid)

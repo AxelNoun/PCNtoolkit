@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from os import PathLike
 from typing import TYPE_CHECKING
 
@@ -11,7 +10,6 @@ import xarray as xr
 from pcntoolkit.math_functions.velocity import (
     compute_thriveline_y,
     compute_thrivelines,
-    propagate_thriveline_z,
     thrivelines_to_dataframe,
 )
 
@@ -25,17 +23,20 @@ if TYPE_CHECKING:
 
 
 class VelocityModel(LongitudinalScore):
-    """Velocity centiles from Bayer et al., 2026 (preprint).
+    """z-gain scores and thrivelines (Bayer et al., 2026, preprint).
 
-    The z-gain score asks whether a subject's later z-score is surprising once
-    their earlier z-score is known. If the typical age-to-age correlation is
-    ``r``, the score is
+    The z-gain asks: given a person's z-score at the earlier visit, is their
+    z-score at the later visit surprising? With ``r`` the correlation of
+    z-scores between the two ages,
 
         z_gain = (z_later − r·z_earlier) / sqrt(1 − r²)
 
-    It works with any regression model and any number of visits. When more than
-    two visits are available, the score uses the most recent transition (i.e.
-    the latest visit conditioned on the immediately preceding visit).
+    Example: z-scores of -0.5 then -2.0, with r = 0.9, give
+    z_gain = (-2.0 + 0.45) / 0.44 ≈ -3.6, a decline far larger than expected
+    (beyond -1.96).
+
+    It works with any regression model and any number of visits. With more
+    than two visits, only the last two are used.
     TODO: Discuss with Johanna if this choice makes sense.
 
     TODO: Using on the full visit history and not only the most recent
@@ -46,22 +47,15 @@ class VelocityModel(LongitudinalScore):
     normative_model : NormativeModel
         A fitted normative model.
     correlation_matrix : CorrelationMatrix
-        Age-to-age z-score correlations, estimated with
-        ``CorrelationMatrix.compute``
-        or loaded from a saved file.
+        How strongly z-scores at two ages correlate, from
+        ``CorrelationMatrix.compute`` or ``CorrelationMatrix.load``.
 
     Attributes
     ----------
     zgain : xr.DataArray | None
-        The most recent z-gain scores produced by ``score``. ``None`` until
-        ``score`` has been called at least once. It stores the same
-        ``xr.DataArray`` that ``score`` returns, so the result can be
-        retrieved later even if the return value was not saved.
+        Last result of ``score``, or ``None`` before the first call.
     thrivelines : pd.DataFrame | None
-        The most recent thrivelines produced by ``get_thrivelines``.
-        ``None`` until ``get_thrivelines`` has been called at least
-        once. A long-form table with columns ``segment``, ``start_age``,
-        ``start_z``, ``response_var``, ``offset``, ``X``, ``Z``, and ``Y``.
+        Last result of ``get_thrivelines``, or ``None`` before the first call.
     """
 
     def __init__(
@@ -84,79 +78,75 @@ class VelocityModel(LongitudinalScore):
     def get_thrivelines(
         self,
         *,
-        timepoint_diff: int = 1,
-        z_thrive: float = -1.96,
-        propagate: Callable[[xr.DataArray, xr.DataArray | float, float], xr.DataArray] = propagate_thriveline_z,
-        anchor_step: int = 1,
+        zgain_threshold: float = -1.96,
+        thriveline_span: int = 1,
+        thriveline_spacing: int = 1,
         centiles: list[float] | np.ndarray | None = None,
         covariate_range: tuple[int, int] | None = None,
         save_path: str | PathLike[str] | None = None,
     ) -> pd.DataFrame:
-        """Estimate and cache thrivelines from this score's correlation matrix.
+        """Compute thrivelines to draw on the centile chart.
 
-        This wraps ``compute_thrivelines``
-        and ``compute_thriveline_y``. It
-        propagates thrivelines in Z-space, then maps them to response-scale Y
-        via ``normative_model``. Covariates other than the thrive covariate
-        are fixed to the midpoint of each covariate's range in the normative
-        model, the same rule
-        ``plot_centiles`` uses when it is given no
-        scatter data. Batch effects use the first allowed level from the
-        normative model.
+        A thriveline is a short line that starts on a centile curve and
+        shows the largest change a person starting there can have in
+        ``thriveline_span`` years and still be within the expected range.
+        Someone who ends up beyond the line has changed more than expected.
+        Draw the result with ``plot_thrivelines``.
+
+        Lines are computed for the first batch effect level in the model, and
+        any covariate other than age is held at the middle of its range.
 
         Parameters
         ----------
-        timepoint_diff : int, default 1
-            Covariate step between the two timepoints on each thriveline
-            segment (e.g. one year).
-        z_thrive : float, default -1.96
-            Shrinkage term passed to the thriveline propagation update.
-        propagate : callable, default ``propagate_thriveline_z``
-            Function that propagates z-scores along one segment:
-            ``propagate(hop_correlations, start_z, z_thrive) -> xr.DataArray``.
-        anchor_step : int, default 1
-            Spacing between starting covariate anchors on the overlay grid.
+        zgain_threshold : float, default -1.96
+            z-gain each line follows, which sets its slope. -1.96 (default):
+            lines slope down to the largest decline that is still expected.
+            +1.96: lines slope up to the largest rise that is still expected.
+            Called zα in Bayer et al. (2026).
+        thriveline_span : int, default 1
+            How far each thriveline stretches along the x-axis, in years.
+            With 2, a thriveline starting at age 40 ends at 42.
+        thriveline_spacing : int, default 1
+            Years between neighbouring thrivelines along the x-axis. With 2,
+            thrivelines start at ages 20, 22, 24, ...
         centiles : array-like of float, optional
-            Centiles (between 0 and 1) where thrivelines start. Defaults to
-            ``[0.05, 0.25, 0.5, 0.75, 0.95]``, the same centiles that
-            ``plot_thrivelines`` draws by
-            default, so every thriveline starts on a plotted centile curve.
+            Centile curves the lines start on, between 0 and 1. For example
+            ``[0.05, 0.5, 0.95]`` starts lines on the 5th, 50th and 95th
+            centile curves. Defaults to ``[0.05, 0.25, 0.5, 0.75, 0.95]``,
+            the curves ``plot_thrivelines`` draws by default.
         covariate_range : tuple of int, optional
-            ``(min, max)`` covariate bounds used to slice the correlation
-            matrix and place grid anchors. When omitted, anchors span the
-            covariate coordinates in the stored correlation matrix.
+            ``(min, max)`` ages to draw lines for, e.g. ``(20, 60)``. Defaults
+            to every age in the correlation matrix.
         save_path : str | PathLike[str] | None, optional
-            If set, write the thriveline table to this CSV path, one row per
-            point on a thriveline. Opened as a table, it looks like::
+            If set, also save the table to this CSV file.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per line end point (two rows per line)::
 
                 segment  start_age  start_z  response_var  offset   X       Z     Y
                 0        20         0.0      lh_thickness  0       20   0.000  2.71
                 0        20         0.0      lh_thickness  1       21  -1.176  2.62
 
-            Read it back with ``pd.read_csv``.
-
-        Returns
-        -------
-        pd.DataFrame
-            Long-form thriveline table with columns ``segment``, ``start_age``,
-            ``start_z``, ``response_var``, ``offset``, ``X``, ``Z``, and ``Y``.
-            Stored on the instance as ``thrivelines``.
+            ``segment`` numbers the lines, ``offset`` is 0 at the start and
+            ``thriveline_span`` at the end, ``X`` is age, ``Z`` the z-score and
+            ``Y`` the brain measure. Also stored as ``self.thrivelines``.
 
         Raises
         ------
         ValueError
-            If ``timepoint_diff`` is not positive, or if a centile is not
-            strictly between 0 and 1.
+            If ``thriveline_span`` is not positive, or if a centile is
+            not strictly between 0 and 1.
         """
-        # Step 1: propagate anchor segments in Z-space from the correlation matrix.
+        # Step 1: compute the start and end z-score of every line.
         # This bare name resolves to the imported velocity function (a module
         # global), not to this method, so it is not a recursive call.
         thrive_Z, thrive_X = compute_thrivelines(
             self.correlation_matrix.matrix,
-            timepoint_diff=timepoint_diff,
-            z_thrive=z_thrive,
-            propagate=propagate,
-            anchor_step=anchor_step,
+            zgain_threshold=zgain_threshold,
+            thriveline_span=thriveline_span,
+            thriveline_spacing=thriveline_spacing,
             centiles=centiles,
             covariate_range=covariate_range,
         )
@@ -178,29 +168,28 @@ class VelocityModel(LongitudinalScore):
         score_data: NormData,
         save_path: str | PathLike[str] | None = None,
     ) -> xr.DataArray:
-        """Compute the z-gain score for every subject in ``score_data``.
+        """Compute one z-gain per subject and brain region.
+
+        Near 0: the person changed as expected. Below -1.96: an unusually
+        large decline. Above +1.96: an unusually large rise.
 
         Parameters
         ----------
         score_data : NormData
-            Longitudinal cohort with at least two distinct visits per subject,
-            numeric visit labels on the NormData object, and z-scores already
-            computed.
+            Subjects to score, with z-scores already predicted and visit
+            numbers set. Subjects with a single visit get NaN.
         save_path : str | PathLike[str] | None, optional
-            If set, write scores to this CSV path, one row per subject and
-            one column per response variable. Opened as a table, it looks
-            like::
+            If set, also save the scores to this CSV file::
 
                 subjects  lh_thickness  rh_thickness
                 sub-01            0.42         -1.10
                 sub-02           -0.35          0.87
-                sub-03            2.13          1.95
 
         Returns
         -------
         xr.DataArray
-            One z-gain score per subject and response variable. The same array
-            is also stored on the instance as ``zgain`` for later retrieval.
+            z-gain with dimensions ``(subjects, response_vars)``. Also stored
+            as ``self.zgain``.
         """
         # Run checks
         self._check_is_predicted(score_data, required=("Z",))

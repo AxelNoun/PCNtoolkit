@@ -273,25 +273,28 @@ def plot_thrivelines(
     plt_kwargs: dict | None = None,
     **kwargs: Any,
 ) -> list[Figure]:
-    """Plot normative centiles with pre-computed thrivelines overlaid.
+    """Draw the centile chart with thrivelines on top.
+
+    Each thriveline is a short blue line starting on a centile curve. A
+    person who starts on that curve and ends up beyond the line has changed
+    more than expected.
 
     Parameters
     ----------
     model : NormativeModel
-        The model used to compute centile curves.
+        The model used to draw the centile curves.
     thrivelines : pd.DataFrame
-        Pre-computed thriveline table from
-        ``VelocityModel.get_thrivelines``.
+        Table from ``VelocityModel.get_thrivelines``.
     centiles : list[float] | np.ndarray | None, optional
-        Centiles to plot. If None, the model defaults are used.
+        Centile curves to draw, e.g. ``[0.05, 0.5, 0.95]``. Use the same
+        values as ``centiles`` in ``get_thrivelines`` so every line
+        starts on a drawn curve. If None, the model defaults are used.
     covariate : str | None, optional
-        Covariate for the x-axis. Defaults to the first model covariate.
+        Covariate on the x-axis. Defaults to the first model covariate.
     covariate_ranges : dict[str, tuple[float, float]] | None, optional
-        Covariate ranges, in each covariate's own units, used for the centile
-        and for clipping the thrivelines. When the plotted covariate is
-        not given a range, it defaults to the span the thrivelines cover, so
-        the centiles start and end where the thrivelines do. Any other
-        covariate defaults to its range in the model.
+        x-axis range per covariate, e.g. ``{"age": (20, 60)}``. Thrivelines
+        outside it are not drawn. Defaults to the ages the thrivelines cover;
+        any other covariate defaults to its range in the model.
     response_vars : list[str] | None, optional
         Response variables to plot. Defaults to all model response variables.
     batch_effects : dict[str, list[str]] | None | Literal["all"], optional
