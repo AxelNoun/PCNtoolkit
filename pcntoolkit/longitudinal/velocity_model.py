@@ -107,13 +107,14 @@ class VelocityModel(LongitudinalScore):
         pd.DataFrame
             Example:
 
-                segment  start_age  start_z  response_var  offset   X       Z     Y
-                0        20         0.0      lh_thickness  0       20   0.000  2.71
-                0        20         0.0      lh_thickness  1       21  -1.176  2.62
+                segment  response_var  offset   X       Z     Y
+                0        lh_thickness  0       20   0.000  2.71
+                0        lh_thickness  1       21  -1.176  2.62
 
             ``segment`` numbers the lines, ``offset`` is 0 at the start and
             ``thriveline_span`` at the end, ``X`` is age, ``Z`` the z-score and
-            ``Y`` the brain measure. Also stored as ``self.thrivelines``.
+            ``Y`` the brain measure. Lines with a missing correlation are left
+            out, with a warning. Also stored as ``self.thrivelines``.
 
         Raises
         ------

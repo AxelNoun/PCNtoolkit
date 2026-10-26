@@ -189,8 +189,6 @@ def test_thrivelines_to_dataframe_long_format():
 
     assert list(df.columns) == [
         "segment",
-        "start_age",
-        "start_z",
         "response_var",
         "offset",
         "X",

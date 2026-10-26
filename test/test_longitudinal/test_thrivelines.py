@@ -187,7 +187,7 @@ def test_compute_thrivelines_zero_correlation_warns_and_omits_segments(
     matrix = correlation_matrix_array_factory(max_age=3, offset_correlations={1: 0.0})
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        thrive_Z, _ = compute_thriveline_z(
+        thrive_Z, thrive_X = compute_thriveline_z(
             matrix,
             thriveline_span=1,
             centiles=[0.5],
@@ -197,7 +197,12 @@ def test_compute_thrivelines_zero_correlation_warns_and_omits_segments(
     assert len(caught) == 1
     assert issubclass(caught[0].category, UserWarning)
     assert "cannot be completed" in str(caught[0].message).lower()
+    # The warning should mention which segments could not be computed.
+    assert "0->1, 1->2" in str(caught[0].message)
     assert np.all(np.isnan(thrive_Z.values))
+    # NaN lines are left out of the final table. Both lines failed, 
+    # so the table should be empty.
+    assert thrivelines_to_dataframe(thrive_Z, thrive_X, thrive_Z).empty
 
 
 def test_compute_thrivelines_respects_covariate_range(correlation_matrix_array_factory):
@@ -250,8 +255,6 @@ def test_thrivelines_to_dataframe_long_format(correlation_matrix_array_factory):
 
     assert list(df.columns) == [
         "segment",
-        "start_age",
-        "start_z",
         "response_var",
         "offset",
         "X",
@@ -275,8 +278,6 @@ def test_zgain_compute_thrivelines_returns_dataframe(
 
     assert list(thrivelines.columns) == [
         "segment",
-        "start_age",
-        "start_z",
         "response_var",
         "offset",
         "X",

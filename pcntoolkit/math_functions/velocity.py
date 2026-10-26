@@ -452,7 +452,7 @@ def compute_thriveline_z(
     )
 
     # Compute every segment independently for each response variable.
-    uncomputed_correlations = False
+    skipped_pairs: set[tuple[int, int]] = set()
     for rv_idx, rv in enumerate(response_vars):
         # Select the 2-D correlation slice for this response variable.
         R_rv = R.sel(response_vars=rv, drop=True)
@@ -469,7 +469,7 @@ def compute_thriveline_z(
             )
             # Skip segments whose correlation is missing or zero (uncomputed offset).
             if r is None or r == 0.0:
-                uncomputed_correlations = True
+                skipped_pairs.add((int(covariate_anchor), int(covariate_to)))
                 continue
             # Find where the line ends, thriveline_span years later.
             z_end = thriveline_end_z(r, z_anchor, zgain_threshold)
@@ -480,14 +480,13 @@ def compute_thriveline_z(
                 covariate_anchor + offsets
             ).values
 
-    # Warn when any segment hits an uncomputed age offset in R.
-    if uncomputed_correlations:
+    # Name the skipped age pairs, since their lines are left out of the output.
+    if skipped_pairs:
+        pairs = ", ".join(f"{a}->{b}" for a, b in sorted(skipped_pairs))
         warnings.warn(
             "Thriveline computation cannot be completed for all requested "
-            f"segments: one or more age pairs at thriveline_span={thriveline_span} "
-            "have zero or missing correlations in the correlation matrix. This "
-            "typically indicates that those age offsets were not estimated "
-            "and the thriveline cannot be computed. Affected segments have been omitted.",
+            f"lines: the correlation matrix has no correlation for ages {pairs}. "
+            "Those lines are left out.",
             UserWarning,
             stacklevel=2,
         )
@@ -635,11 +634,8 @@ def compute_thriveline_y(
 
 
 # Public long-form schema: one row per point on a thriveline segment.
-# A segment is one (start_age, start_z) anchor propagated over thriveline_span.
 THRIVELINE_DF_COLUMNS = (
     "segment",
-    "start_age",
-    "start_z",
     "response_var",
     "offset",
     "X",
@@ -671,8 +667,8 @@ def thrivelines_to_dataframe(
     """Convert propagated thriveline arrays to a long-form table.
 
     Each row is one point on one segment for one response variable. Columns are
-    ``segment``, ``start_age``, ``start_z``, ``response_var``, ``offset``,
-    ``X``, ``Z``, and ``Y``.
+    ``segment``, ``response_var``, ``offset``, ``X``, ``Z``, and ``Y``.
+    Segments that could not be computed (NaN) are left out.
 
     Parameters
     ----------
@@ -687,13 +683,6 @@ def thrivelines_to_dataframe(
         plotting.
     """
     rows: list[dict[str, object]] = []
-    # Segment-level anchor metadata attached by compute_thriveline_z.
-    start_ages = (
-        thrive_Z.coords["start_age"].values if "start_age" in thrive_Z.coords else None
-    )
-    start_zs = (
-        thrive_Z.coords["start_z"].values if "start_z" in thrive_Z.coords else None
-    )
     offsets = thrive_Z.coords["offset"].values
 
     for rv in thrive_Z.coords["response_vars"].values:
@@ -701,16 +690,15 @@ def thrivelines_to_dataframe(
         x_rv = thrive_X.sel(response_vars=rv, drop=True)
         y_rv = thrive_Y.sel(response_vars=rv, drop=True)
         for seg_idx in range(z_rv.sizes["segment"]):
+            # Skip segments that could not be computed; the warning names them.
+            if np.isnan(z_rv.isel(segment=seg_idx).values).all():
+                continue
             segment = int(z_rv.coords["segment"].values[seg_idx])
-            start_age = float(start_ages[seg_idx]) if start_ages is not None else np.nan
-            start_z = float(start_zs[seg_idx]) if start_zs is not None else np.nan
             # Each segment has two points: offset 0 (anchor) and offset thriveline_span.
             for off_idx, offset in enumerate(offsets):
                 rows.append(
                     {
                         "segment": segment,
-                        "start_age": start_age,
-                        "start_z": start_z,
                         "response_var": str(rv),
                         "offset": int(offset),
                         "X": float(x_rv.isel(segment=seg_idx, offset=off_idx).item()),
