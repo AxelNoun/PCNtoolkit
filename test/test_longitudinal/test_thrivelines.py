@@ -10,31 +10,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
-import xarray as xr
 from scipy.stats import norm
 
 from pcntoolkit.longitudinal.velocity_model import VelocityModel
 from pcntoolkit.math_functions.velocity import (
     _resolve_reference_batch_effects,
     compute_thrivelines,
-    propagate_thriveline_z,
     thrivelines_to_dataframe,
 )
 from pcntoolkit.util.plotter import plot_thrivelines
-
-
-def test_propagate_thriveline_z_multi_hop():
-    hop = xr.DataArray(
-        [0.7, 0.6],
-        dims=("hop",),
-        coords={"hop": [0, 1]},
-        attrs={"thriveline_span": 1},
-    )
-    z_path = propagate_thriveline_z(hop, start_z=0.5, zgain_threshold=-1.96)
-
-    assert list(z_path.coords["offset"].values) == [0, 1, 2]
-    assert z_path.isel(offset=0).item() == pytest.approx(0.5)
-    assert np.isfinite(z_path.isel(offset=2).item())
 
 
 def test_compute_thrivelines_negative_correlation(correlation_matrix_array_factory):
@@ -108,24 +92,6 @@ def test_plot_thrivelines_rejects_missing_columns(fitted_norm_blr_model):
             bad_df,
             show_figure=False,
         )
-
-
-def test_propagate_thriveline_z_requires_hop_dimension():
-    with pytest.raises(ValueError, match="hop"):
-        propagate_thriveline_z(xr.DataArray([0.8]), start_z=0.0)
-
-
-def test_propagate_thriveline_z_bayer_update():
-    hop = xr.DataArray(
-        [0.8], dims=("hop",), coords={"hop": [0]}, attrs={"thriveline_span": 2}
-    )
-    z_path = propagate_thriveline_z(hop, start_z=1.0, zgain_threshold=-1.96)
-
-    expected_next = 1.0 * 0.8 + math.sqrt(1.0 - 0.8**2) * (-1.96)
-    assert z_path.dims == ("offset",)
-    assert list(z_path.coords["offset"].values) == [0, 2]
-    assert z_path.values[0] == pytest.approx(1.0)
-    assert z_path.values[1] == pytest.approx(expected_next)
 
 
 def test_compute_thrivelines_rejects_non_positive_thriveline_span(

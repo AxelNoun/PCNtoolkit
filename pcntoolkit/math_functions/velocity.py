@@ -9,7 +9,6 @@ from __future__ import annotations
 import math
 import warnings
 from collections import defaultdict
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -293,62 +292,39 @@ def design_matrix(bandwidth: int, Sigma: np.ndarray) -> pd.DataFrame:
 # ------------------------------------------------------------------- #
 
 
-def propagate_thriveline_z(
-    correlations: xr.DataArray,
-    start_z: xr.DataArray | float,
+def thriveline_end_z(
+    r: float,
+    start_z: float,
     zgain_threshold: float = -1.96,
-) -> xr.DataArray:
-    """Compute where one thriveline ends, in z-scores (Bayer et al., 2026).
+) -> float:
+    """Compute the z-score where one thriveline ends (Bayer et al., 2026).
 
-    Each step applies
+    The line ends at the later z-score whose z-gain is exactly
+    ``zgain_threshold``. Solving ``z_gain = (z_end − r·z_start) / sqrt(1 − r²)``
+    for ``z_end`` gives
 
-        Z_next = r * Z_current + sqrt(1 - r²) * zgain_threshold
+        z_end = r · z_start + sqrt(1 − r²) · zgain_threshold
 
-    where ``r`` is the correlation between the two timepoints. This is the
-    z-gain formula solved for the later z-score, so the z-gain from the
-    start to the end of the line equals ``zgain_threshold``.
+    Example: with ``r = 0.8``, ``start_z = 0`` and ``zgain_threshold = -1.96``,
+    ``z_end = 0.6 · -1.96 ≈ -1.18``.
 
     Parameters
     ----------
-    correlations : xr.DataArray
-        Correlation for each step, earliest timepoint first. Must have
-        dimension ``hop``.
-    start_z : xr.DataArray or float
-        Z-score where the line starts.
+    r : float
+        Correlation of z-scores between the start and end age of the line,
+        between -1 and 1.
+    start_z : float
+        z-score where the line starts.
     zgain_threshold : float, default -1.96
-        z-gain the line follows: -1.96 slopes down, +1.96 slopes up.
+        z-gain the line follows. -1.96 marks the largest decline that is still
+        expected, +1.96 the largest rise.
 
     Returns
     -------
-    xr.DataArray
-        Z-scores along the line, dimension ``offset``.
+    float
+        z-score where the line ends.
     """
-    # Require the hop dimension so correlations are ordered in time.
-    if "hop" not in correlations.dims:
-        raise ValueError("correlations must have dimension 'hop'.")
-
-    # Normalise the starting z-score to a plain Python float.
-    z0 = float(start_z.item() if isinstance(start_z, xr.DataArray) else start_z)
-    # Store every z-score visited along the segment, beginning at the anchor.
-    z_path = [z0]
-    # Track the z-score at the current timepoint while propagating forward.
-    current = z0
-    # Apply the thriveline update once per hop in chronological order.
-    for r in correlations.transpose("hop").values:
-        # Next z-score that gives a z-gain of exactly zgain_threshold.
-        current = current * float(r) + math.sqrt(1.0 - float(r) ** 2) * zgain_threshold
-        # Append the propagated z-score to the segment path.
-        z_path.append(current)
-
-    # Read the covariate spacing between consecutive offsets, defaulting to 1.
-    thriveline_span = correlations.attrs.get("thriveline_span", 1)
-    # Return the full z-path labelled by covariate offset from the anchor.
-    return xr.DataArray(
-        z_path,
-        dims=("offset",),
-        coords={"offset": np.arange(len(z_path)) * thriveline_span},
-        attrs={"zgain_threshold": zgain_threshold, "thriveline_span": thriveline_span},
-    )
+    return r * start_z + math.sqrt(1.0 - r**2) * zgain_threshold
 
 
 def compute_thrivelines(
@@ -359,9 +335,6 @@ def compute_thrivelines(
     thriveline_spacing: int = 1,
     centiles: list[float] | np.ndarray | None = None,
     covariate_range: tuple[int, int] | None = None,
-    propagate: Callable[
-        [xr.DataArray, xr.DataArray | float, float], xr.DataArray
-    ] = propagate_thriveline_z,
 ) -> tuple[xr.DataArray, xr.DataArray]:
     """Compute thrivelines, in z-scores, from a correlation matrix.
 
@@ -391,10 +364,6 @@ def compute_thrivelines(
         draws by default.
     covariate_range : tuple of int, optional
         ``(min, max)`` ages to draw lines for. Defaults to every age in ``R``.
-    propagate : callable, default ``propagate_thriveline_z``
-        Function that computes where a line ends:
-        ``propagate(hop_correlations, start_z, zgain_threshold)``. Only change
-        it to try a different formula.
 
     Returns
     -------
@@ -409,7 +378,7 @@ def compute_thrivelines(
         If ``thriveline_span`` is not positive, or if a centile is not
         strictly between 0 and 1.
     """
-    # Reject non-positive covariate steps because propagation needs a forward hop.
+    # Reject non-positive spans because a line must move forward in age.
     if thriveline_span <= 0:
         raise ValueError("thriveline_span must be > 0.")
 
@@ -467,7 +436,7 @@ def compute_thrivelines(
             "offset": offsets,
         },
         attrs={
-            "propagate": getattr(propagate, "__name__", str(propagate)),
+            "zgain_threshold": zgain_threshold,
             "thriveline_span": thriveline_span,
         },
     )
@@ -482,7 +451,7 @@ def compute_thrivelines(
         },
     )
 
-    # Propagate every segment independently for each response variable.
+    # Compute every segment independently for each response variable.
     uncomputed_correlations = False
     for rv_idx, rv in enumerate(response_vars):
         # Select the 2-D correlation slice for this response variable.
@@ -493,7 +462,7 @@ def compute_thrivelines(
             # The forward timepoint is one fixed covariate step later.
             covariate_to = covariate_anchor + thriveline_span
             # Read the starting z-score for this segment (shared across regions).
-            z_anchor = start_z.isel(segment=seg_idx)
+            z_anchor = float(start_z.isel(segment=seg_idx).item())
             # Look up the Pearson r between anchor and forward covariate values.
             r = _lookup_correlation(
                 R_rv, covariate_anchor, covariate_to, age_dim_later, age_dim_earlier
@@ -502,22 +471,10 @@ def compute_thrivelines(
             if r is None or r == 0.0:
                 uncomputed_correlations = True
                 continue
-            # Package the single-hop correlation for the propagate callable.
-            hop_rs = xr.DataArray(
-                [r],
-                dims=("hop",),
-                coords={"hop": [0]},
-                attrs={"thriveline_span": thriveline_span},
-            )
-            # Propagate the anchor z-score forward by one covariate step.
-            z_path = propagate(hop_rs, z_anchor, zgain_threshold)
-            # Require propagate to return offset-labelled z-scores.
-            if "offset" not in z_path.dims:
-                raise ValueError(
-                    "propagate must return an xr.DataArray with dimension 'offset'."
-                )
-            # Store the propagated z-scores for this segment and response variable.
-            thrive_Z[{"segment": seg_idx, "response_vars": rv_idx}] = z_path.values
+            # Find where the line ends, thriveline_span years later.
+            z_end = thriveline_end_z(r, z_anchor, zgain_threshold)
+            # Store the start and end z-scores for this segment and response variable.
+            thrive_Z[{"segment": seg_idx, "response_vars": rv_idx}] = [z_anchor, z_end]
             # Store the matching covariate coordinates (anchor and forward point).
             thrive_X[{"segment": seg_idx, "response_vars": rv_idx}] = (
                 covariate_anchor + offsets
@@ -763,8 +720,8 @@ def thrivelines_to_dataframe(
                 )
 
     df = pd.DataFrame(rows, columns=list(THRIVELINE_DF_COLUMNS))
-    # Preserve propagation metadata for downstream inspection.
-    for key in ("thriveline_span", "propagate"):
+    # Keep the settings the lines were computed with for later inspection.
+    for key in ("thriveline_span", "zgain_threshold"):
         if key in thrive_Z.attrs:
             df.attrs[key] = thrive_Z.attrs[key]
     return df

@@ -13,7 +13,7 @@ from scipy.stats import norm
 from pcntoolkit.math_functions.velocity import (
     _resolve_reference_batch_effects,
     compute_thrivelines,
-    propagate_thriveline_z,
+    thriveline_end_z,
     thrivelines_to_dataframe,
 )
 
@@ -46,22 +46,12 @@ def _make_correlation_matrix(
     )
 
 
-def test_propagate_thriveline_z_requires_hop_dimension():
-    with pytest.raises(ValueError, match="hop"):
-        propagate_thriveline_z(xr.DataArray([0.8]), start_z=0.0)
+def test_thriveline_end_z_has_zgain_threshold():
+    r, start_z = 0.8, 1.0
+    z_end = thriveline_end_z(r, start_z, zgain_threshold=-1.96)
 
-
-def test_propagate_thriveline_z_bayer_update():
-    hop = xr.DataArray(
-        [0.8], dims=("hop",), coords={"hop": [0]}, attrs={"thriveline_span": 2}
-    )
-    z_path = propagate_thriveline_z(hop, start_z=1.0, zgain_threshold=-1.96)
-
-    expected_next = 1.0 * 0.8 + math.sqrt(1.0 - 0.8**2) * (-1.96)
-    assert z_path.dims == ("offset",)
-    assert list(z_path.coords["offset"].values) == [0, 2]
-    assert z_path.values[0] == pytest.approx(1.0)
-    assert z_path.values[1] == pytest.approx(expected_next)
+    zgain = (z_end - r * start_z) / math.sqrt(1.0 - r**2)
+    assert zgain == pytest.approx(-1.96)
 
 
 def test_compute_thrivelines_rejects_non_positive_thriveline_span():
