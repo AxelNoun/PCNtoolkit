@@ -22,13 +22,8 @@ if TYPE_CHECKING:
 
 
 class CorrelationMatrix:
-    """How strongly a person's z-scores at two ages correlate.
+    """How strongly a person's z-scores at two timepoints correlate.
 
-    Each cell holds one correlation. For example, 0.9 at ages 40 and 41 means
-    a person's z-score at 40 predicts their z-score at 41 well. Correlations
-    are highest next to the diagonal (ages close together) and drop as the
-    gap grows. ``VelocityModel`` needs this matrix to compute z-gains and
-    thrivelines.
 
     Do not call ``CorrelationMatrix(...)`` directly. Use ``compute`` to
     estimate one from your data, or ``load`` to read saved CSV files.
