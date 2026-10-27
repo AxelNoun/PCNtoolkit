@@ -218,6 +218,24 @@ def test_compute_thrivelines_respects_covariate_range(correlation_matrix_array_f
     assert np.all(np.isfinite(thrive_X.sel(response_vars="metric_a").values))
 
 
+def test_compute_thrivelines_default_covariate_range(
+    fitted_norm_blr_model, correlation_matrix_array_factory
+):
+    """Without covariate_range, lines cover the model's training range (0-1),
+    not every age in the matrix (0-5)."""
+    matrix = correlation_matrix_array_factory(
+        max_age=5, response_vars=["response_var_0"], covariate="covariate_0"
+    )
+    corr = CorrelationMatrix(matrix, covariate="covariate_0")
+
+    thrivelines = VelocityModel(fitted_norm_blr_model, corr).compute_thrivelines(
+        centiles=[0.5]
+    )
+
+    assert thrivelines["X"].min() == 0
+    assert thrivelines["X"].max() == 1
+
+
 def test_resolve_reference_batch_effects_uses_first_level(batch_effect_model):
     resolved = _resolve_reference_batch_effects(batch_effect_model)
     assert resolved == {"site": "A", "sex": "F"}
