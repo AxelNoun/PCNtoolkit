@@ -14,7 +14,7 @@ and supports both homoskedastic and heteroskedastic noise models.
 from __future__ import annotations
 
 import copy
-from typing import TYPE_CHECKING, Generator, Literal, Optional
+from typing import TYPE_CHECKING, Any, Generator, Literal, Optional
 
 import numpy as np
 import xarray as xr
@@ -544,7 +544,7 @@ class BLR(RegressionModel):
         be: xr.DataArray,
         be_maps: dict[str, dict[str, int]],
         Y: xr.DataArray,
-        **kwargs,
+        **kwargs: Any,
     ) -> BLR:
         """Adapt a fitted BLR to new batch effects (e.g. a new site).
 
@@ -576,6 +576,8 @@ class BLR(RegressionModel):
             Mapping from batch-effect labels to encoded integer ids.
         Y : xr.DataArray
             Response variable of the adaptation subjects.
+        **kwargs : Any
+            Unused. Accepted for compatibility with other regression models.
 
         Returns
         -------
